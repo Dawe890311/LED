@@ -1,0 +1,19 @@
+# LED植物照明光学度量体系分析系统 - 依赖库
+# LED Plant Lighting Optical Metric Analysis System - Dependencies
+
+# 核心框架
+streamlit>=1.28.0
+
+# 数据处理
+pandas>=1.5.0
+numpy>=1.21.0
+
+# 数据可视化
+plotly>=5.15.0
+
+# Excel文件支持
+openpyxl>=3.0.0
+
+# 可选依赖（用于高级功能）
+scipy>=1.9.0        # 科学计算
+xlrd>=2.0.0         # 旧版Excel文件支持
