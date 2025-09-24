@@ -79,8 +79,8 @@ def main():
             
             **新的核心计算公式**
             ```
-            光子辐射转化系数 = 光合有效积分 ÷ 总积分
-            总光子通量 = 总辐射通量 × 光子辐射转化系数 (μmol/s)
+            光能比 = 光合有效积分 ÷ 总积分
+            总光子通量 = 总辐射通量 × 光能比 (μmol/s)
             PPE = 总光子通量 ÷ 总功率 (μmol/J)
             ```
             
@@ -99,7 +99,7 @@ def main():
             - 良好: 2.0-2.5 μmol/J  
             - 一般: < 2.0 μmol/J
             
-            **PAR效率等级**
+            **PAR占比等级**
             - 优秀: > 80%
             - 良好: 60-80%
             - 一般: < 60%
@@ -108,7 +108,7 @@ def main():
             - 叶菜类: 0.5-1.5
             - 果菜类: 1.0-3.0
             
-            **光子转化系数**
+            **光能比**
             - 高效: > 0.5
             - 中等: 0.3-0.5
             - 低效: < 0.3
@@ -498,17 +498,17 @@ def calculate_light_analysis(df, total_radiation_flux, total_power, back_panel_t
     luminous_efficacy = total_radiation_flux / total_power if total_power > 0 else 0
     
     # 8. 重新设计的计算指标
-    # 光子辐射转化系数 (光合有效积分/总积分)
-    photon_radiation_conversion_factor = photosynthetic_active / total_integration if total_integration > 0 else 0
+    # 光能比 (光合有效积分/总积分)
+    light_energy_ratio = photosynthetic_active / total_integration if total_integration > 0 else 0
     
-    # 总光子通量 (总辐射通量 × 光子辐射转化系数，单位: μmol/s)
-    total_photon_flux = total_radiation_flux * photon_radiation_conversion_factor
+    # 总光子通量 (总辐射通量 × 光能比，单位: μmol/s)
+    total_photon_flux = total_radiation_flux * light_energy_ratio
     
     # PPE (总光子通量/总功率，单位: μmol/J)
     ppe = total_photon_flux / total_power if total_power > 0 else 0
     
-    # 保留原有的PAR效率计算
-    par_efficiency = par_integration / total_integration if total_integration > 0 else 0
+    # 保留原有的PAR占比计算
+    par_ratio = par_integration / total_integration if total_integration > 0 else 0
     
     # 保留原有的光质比例计算
     # R/B (红光积分/蓝光积分)
@@ -517,24 +517,19 @@ def calculate_light_analysis(df, total_radiation_flux, total_power, back_panel_t
     # R/Fr (红光积分/远红光积分)
     r_fr_ratio = red_integration / far_red_integration if far_red_integration > 0 else 0
     
-    # 新增光形态建成比例参数
-    # B/G (蓝光积分/绿光积分)
-    b_g_ratio = blue_integration / green_integration if green_integration > 0 else 0
-    
-    # UV-A/B (UV-A积分/蓝光积分)
+    # UV-A/B (UV-A积分/蓝光积分) - 移到光质比例指标
     uva_b_ratio = uva_integration / blue_integration if blue_integration > 0 else 0
     
-    # V/B (紫光积分/蓝光积分)  
+    # 删除的比例参数
+    # b_g_ratio = blue_integration / green_integration if green_integration > 0 else 0
+    # g_r_ratio = green_integration / red_integration if red_integration > 0 else 0
+    
+    # 保留的其他比例参数
     v_b_ratio = violet_integration / blue_integration if blue_integration > 0 else 0
-    
-    # G/R (绿光积分/红光积分)
-    g_r_ratio = green_integration / red_integration if red_integration > 0 else 0
-    
-    # NIR/R (近红外积分/红光积分)
     nir_r_ratio = nir_integration / red_integration if red_integration > 0 else 0
     
-    # PAR功率 (总辐射通量 × PAR效率，单位: W)
-    par_power = total_radiation_flux * par_efficiency
+    # PAR功率 (总辐射通量 × PAR占比，单位: W)
+    par_power = total_radiation_flux * par_ratio
     
     # 9. 植物光合敏感曲线P(λ)相关计算 (McCree 1972)
     def plant_photosynthetic_response(wavelength):
@@ -658,9 +653,9 @@ def calculate_light_analysis(df, total_radiation_flux, total_power, back_panel_t
     else:
         leafy_score += 10
     
-    if par_efficiency > 0.8:
+    if par_ratio > 0.8:
         leafy_score += 25
-    elif par_efficiency > 0.6:
+    elif par_ratio > 0.6:
         leafy_score += 15
     else:
         leafy_score += 5
@@ -688,9 +683,9 @@ def calculate_light_analysis(df, total_radiation_flux, total_power, back_panel_t
     else:
         fruit_score += 10
     
-    if par_efficiency > 0.8:
+    if par_ratio > 0.8:
         fruit_score += 25
-    elif par_efficiency > 0.6:
+    elif par_ratio > 0.6:
         fruit_score += 15
     else:
         fruit_score += 5
@@ -768,7 +763,7 @@ def calculate_light_analysis(df, total_radiation_flux, total_power, back_panel_t
     if ppe < 2.0:
         optimization_suggestions.append("建议提高PPE：增加光合有效光子输出比例")
     
-    if par_efficiency < 0.6:
+    if par_ratio < 0.6:
         optimization_suggestions.append("建议优化光谱分布：提高PAR波段(400-700nm)比例")
     
     if r_b_ratio < 0.3:
@@ -825,7 +820,7 @@ def calculate_light_analysis(df, total_radiation_flux, total_power, back_panel_t
     vegetative_score = 50
     if 1.0 <= r_b_ratio <= 2.0:
         vegetative_score += 20
-    if par_efficiency > 0.7:
+    if par_ratio > 0.7:
         vegetative_score += 15
     if 10 <= green_percentage <= 15:
         vegetative_score += 10
@@ -849,7 +844,7 @@ def calculate_light_analysis(df, total_radiation_flux, total_power, back_panel_t
     fruiting_score = 50
     if ppe > 2.2:
         fruiting_score += 15
-    if par_efficiency > 0.8:
+    if par_ratio > 0.8:
         fruiting_score += 15
     if 1.5 <= r_b_ratio <= 3.0:
         fruiting_score += 15
@@ -875,11 +870,11 @@ def calculate_light_analysis(df, total_radiation_flux, total_power, back_panel_t
     annual_operating_cost = daily_operating_cost * 365  # 元/year
     
     # 光质评价 - 基于新的计算标准
-    def evaluate_light_quality(ppe_val, par_eff, rb_ratio):
+    def evaluate_light_quality(ppe_val, par_ratio_val, rb_ratio):
         """基于新PPE标准的光质评价"""
         # PPE评价标准 (μmol/J)
         ppe_score = 3 if ppe_val > 2.5 else 2 if ppe_val > 2.0 else 1
-        par_score = 3 if par_eff > 0.8 else 2 if par_eff > 0.6 else 1
+        par_score = 3 if par_ratio_val > 0.8 else 2 if par_ratio_val > 0.6 else 1
         rb_score = 3 if 0.5 <= rb_ratio <= 3.0 else 2 if 0.3 <= rb_ratio <= 4.0 else 1
         
         total_score = ppe_score + par_score + rb_score
@@ -890,7 +885,7 @@ def calculate_light_analysis(df, total_radiation_flux, total_power, back_panel_t
         else:
             return "一般", "📈"
     
-    quality_rating, quality_icon = evaluate_light_quality(ppe, par_efficiency, r_b_ratio)
+    quality_rating, quality_icon = evaluate_light_quality(ppe, par_ratio, r_b_ratio)
     
     results = {
         'input_params': {
@@ -916,18 +911,16 @@ def calculate_light_analysis(df, total_radiation_flux, total_power, back_panel_t
             'luminous_efficacy': luminous_efficacy,
             
             # 新的核心计算指标
-            'photon_radiation_conversion_factor': photon_radiation_conversion_factor,
+            'light_energy_ratio': light_energy_ratio,
             'total_photon_flux': total_photon_flux,
             'ppe': ppe,
             
             # 保留的指标
-            'par_efficiency': par_efficiency,
+            'par_ratio': par_ratio,
             'r_b_ratio': r_b_ratio,
             'r_fr_ratio': r_fr_ratio,
-            'b_g_ratio': b_g_ratio,
             'uva_b_ratio': uva_b_ratio,
             'v_b_ratio': v_b_ratio,
-            'g_r_ratio': g_r_ratio,
             'nir_r_ratio': nir_r_ratio,
             'par_power': par_power,
             
@@ -1060,12 +1053,12 @@ def display_results(results, df):
         """, unsafe_allow_html=True)
     
     with col2:
-        par_rating = "优秀" if results['calculations']['par_efficiency'] > 0.8 else "良好" if results['calculations']['par_efficiency'] > 0.6 else "一般"
+        par_rating = "优秀" if results['calculations']['par_ratio'] > 0.8 else "良好" if results['calculations']['par_ratio'] > 0.6 else "一般"
         color = "#28a745" if par_rating == "优秀" else "#ffc107" if par_rating == "良好" else "#dc3545"
         st.markdown(f"""
         <div style='background: {color}; padding: 1rem; border-radius: 10px; text-align: center; color: white;'>
-            <h4>🌿 PAR效率评价: {par_rating}</h4>
-            <p>数值: {results['calculations']['par_efficiency']:.1%}</p>
+            <h4>🌿 PAR占比评价: {par_rating}</h4>
+            <p>数值: {results['calculations']['par_ratio']:.1%}</p>
             <p>标准: >80%优秀, 60-80%良好, <60%一般</p>
         </div>
         """, unsafe_allow_html=True)
@@ -1096,21 +1089,21 @@ def display_results(results, df):
         )
     with col2:
         st.metric(
-            "🔄 光子转化系数", 
-            f"{results['calculations']['photon_radiation_conversion_factor']:.3f}",
-            help="光合有效积分/总积分，光子辐射转化效率"
+            "🌱 总光子通量 μmol/s", 
+            f"{results['calculations']['total_photon_flux']:.2f}",
+            help="总辐射通量×光能比"
         )
     with col3:
         st.metric(
-            "🌱 总光子通量 μmol/s", 
-            f"{results['calculations']['total_photon_flux']:.2f}",
-            help="总辐射通量×光子辐射转化系数"
+            "🌿 PAR占比", 
+            f"{results['calculations']['par_ratio']:.1%}",
+            help="PAR积分/总积分，光合有效辐射比例"
         )
     with col4:
         st.metric(
-            "🌿 PAR效率", 
-            f"{results['calculations']['par_efficiency']:.3f}",
-            help="PAR积分/总积分，光合有效辐射比例"
+            "🔄 光能比", 
+            f"{results['calculations']['light_energy_ratio']:.3f}",
+            help="光合有效积分/总积分，光合有效光能转化效率"
         )
     
     # 光质比例指标
@@ -1132,39 +1125,9 @@ def display_results(results, df):
         )
     with col3:
         st.metric(
-            "🔵/🟢 B/G", 
-            f"{results['calculations']['b_g_ratio']:.2f}",
-            help="蓝光积分/绿光积分，影响叶片发育"
-        )
-    with col4:
-        st.metric(
-            "🟢/🔴 G/R", 
-            f"{results['calculations']['g_r_ratio']:.2f}",
-            help="绿光积分/红光积分，影响光形态建成"
-        )
-    
-    # 新增光形态建成指标
-    st.subheader("🌱 光形态建成指标")
-    
-    col1, col2, col3, col4 = st.columns(4)
-    
-    with col1:
-        st.metric(
-            "🟣 UV-A/B", 
+            "🟣/🔵 UV-A/B", 
             f"{results['calculations']['uva_b_ratio']:.3f}",
             help="UV-A积分/蓝光积分，影响植物抗逆性"
-        )
-    with col2:
-        st.metric(
-            "💜 V/B", 
-            f"{results['calculations']['v_b_ratio']:.3f}",
-            help="紫光积分/蓝光积分，影响花青素合成"
-        )
-    with col3:
-        st.metric(
-            "🌿 形态指数", 
-            f"{results['calculations']['morphology_index']}",
-            help="基于R/Fr比值的植物形态预测"
         )
     with col4:
         st.metric(
@@ -1295,12 +1258,12 @@ def display_results(results, df):
     
     with col2:
         # 光谱质量雷达图
-        categories = ['完整性', '平衡性', 'PAR效率', 'PPE性能', '红蓝比适宜度']
+        categories = ['完整性', '平衡性', 'PAR占比', 'PPE性能', '红蓝比适宜度']
         
         # 计算各维度得分（0-1标准化）
         completeness_score = results['calculations']['spectral_completeness']
         balance_score = results['calculations']['spectral_balance']
-        par_score = min(results['calculations']['par_efficiency'] / 0.9, 1.0)  # 以0.9为满分
+        par_score = min(results['calculations']['par_ratio'] / 0.9, 1.0)  # 以0.9为满分
         ppe_score = min(results['calculations']['ppe'] / 3.0, 1.0)  # 以3.0为满分
         rb_score = 1.0 if 0.5 <= results['calculations']['r_b_ratio'] <= 3.0 else 0.5
         
@@ -1759,14 +1722,14 @@ def display_results(results, df):
         st.markdown("#### 🎯 性能指标")
         performance_data = {
             "指标": [
-                "PPE (新标准)", "光子转化系数", "总光子通量", "PAR效率", 
+                "PPE (新标准)", "总光子通量", "PAR占比", "光能比", 
                 "R/B比", "R/Fr比", "PAR功率", "光效"
             ],
             "数值": [
                 f"{results['calculations']['ppe']:.3f} μmol/J",
-                f"{results['calculations']['photon_radiation_conversion_factor']:.3f}",
                 f"{results['calculations']['total_photon_flux']:.2f} μmol/s",
-                f"{results['calculations']['par_efficiency']:.3f}",
+                f"{results['calculations']['par_ratio']:.3f}",
+                f"{results['calculations']['light_energy_ratio']:.3f}",
                 f"{results['calculations']['r_b_ratio']:.2f}",
                 f"{results['calculations']['r_fr_ratio']:.2f}",
                 f"{results['calculations']['par_power']:.2f} W",
@@ -1774,9 +1737,9 @@ def display_results(results, df):
             ],
             "说明": [
                 "总光子通量/总功率",
-                "光合有效积分/总积分",
-                "总辐射通量×转化系数",
+                "总辐射通量×光能比",
                 "光合有效辐射比例",
+                "光合有效积分/总积分",
                 "红蓝光比例",
                 "红远红光比例",
                 "PAR波段功率",
@@ -1806,7 +1769,7 @@ def display_results(results, df):
                 f"{results['calculations']['light_quality_total']:.2f}"
             ],
             "占比 (%)": [
-                "-", "-", f"{results['calculations']['par_efficiency']*100:.1f}%",
+                "-", "-", f"{results['calculations']['par_ratio']*100:.1f}%",
                 f"{results['percentages']['blue_percentage']:.1f}%",
                 f"{results['percentages']['green_percentage']:.1f}%",
                 f"{results['percentages']['red_percentage']:.1f}%",
@@ -1823,7 +1786,7 @@ def display_results(results, df):
     
     # 计算一些评价指标
     ppe_rating = "优秀" if results['calculations']['ppe'] > 2.5 else "良好" if results['calculations']['ppe'] > 2.0 else "一般"
-    par_rating = "优秀" if results['calculations']['par_efficiency'] > 0.8 else "良好" if results['calculations']['par_efficiency'] > 0.6 else "一般"
+    par_rating = "优秀" if results['calculations']['par_ratio'] > 0.8 else "良好" if results['calculations']['par_ratio'] > 0.6 else "一般"
     
     col1, col2, col3 = st.columns(3)
     
@@ -1833,14 +1796,14 @@ def display_results(results, df):
         
         PPE (新): {results['calculations']['ppe']:.3f} μmol/J
         
-        光子转化系数: {results['calculations']['photon_radiation_conversion_factor']:.3f}
+        光能比: {results['calculations']['light_energy_ratio']:.3f}
         """)
     
     with col2:
         st.success(f"""
         **🌿 光质评价**: {par_rating}
         
-        PAR效率: {results['calculations']['par_efficiency']:.1%}
+        PAR占比: {results['calculations']['par_ratio']:.1%}
         
         R/B比: {results['calculations']['r_b_ratio']:.2f}
         """)
