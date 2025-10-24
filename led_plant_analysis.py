@@ -4,6 +4,1021 @@ import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+import base64
+import io
+from datetime import datetime
+
+# 尝试导入PDF相关库，如果失败则使用简化版本
+try:
+    import plotly.io as pio
+    from matplotlib import pyplot as plt
+    import seaborn as sns
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, Table, TableStyle, PageBreak
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import inch
+    # 尝试导入PIL用于图像处理
+    try:
+        from PIL import Image as PILImage
+        PIL_AVAILABLE = True
+    except ImportError:
+        PIL_AVAILABLE = False
+    PDF_AVAILABLE = True
+except ImportError:
+    PDF_AVAILABLE = False
+    PIL_AVAILABLE = False
+
+def generate_simplified_report(results, df_clean):
+    """生成简化版本的HTML报告（当PDF库不可用时）"""
+    
+    # 获取基本信息
+    basic_info = results.get('basic_info', {})
+    input_params = results.get('input_params', {})
+    calculations = results.get('calculations', {})
+    percentages = results.get('percentages', {})
+    
+    # 当前时间
+    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    # 构建简化的HTML报告
+    html_content = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <title>LED植物照明光学度量体系分析报告</title>
+        <style>
+            body {{ font-family: Arial, sans-serif; margin: 20px; line-height: 1.6; }}
+            h1 {{ color: #2c3e50; text-align: center; }}
+            h2 {{ color: #3498db; border-bottom: 2px solid #3498db; padding-bottom: 5px; }}
+            table {{ width: 100%; border-collapse: collapse; margin: 20px 0; }}
+            th, td {{ border: 1px solid #ddd; padding: 8px; text-align: left; }}
+            th {{ background-color: #3498db; color: white; }}
+            .highlight {{ background-color: #f1f2f6; padding: 15px; border-left: 4px solid #3498db; }}
+        </style>
+    </head>
+    <body>
+        <h1>🌱 LED植物照明光学度量体系分析报告</h1>
+        <p><strong>报告生成时间：</strong>{current_time}</p>
+        
+        <h2>📋 测试基本信息</h2>
+        <table>
+            <tr><th>项目</th><th>数值</th></tr>
+            <tr><td>灯具型号</td><td>{basic_info.get('lamp_model', '未填写')}</td></tr>
+            <tr><td>制造商/单位</td><td>{basic_info.get('manufacturer', '未填写')}</td></tr>
+            <tr><td>测试日期</td><td>{basic_info.get('test_date', '未填写')}</td></tr>
+            <tr><td>总辐射通量</td><td>{input_params.get('total_radiation_flux', 0):.1f} W</td></tr>
+            <tr><td>总功率</td><td>{input_params.get('total_power', 0):.1f} W</td></tr>
+            <tr><td>后面板温度</td><td>{input_params.get('back_panel_temp', 0):.1f} ℃</td></tr>
+            <tr><td>功率因数</td><td>{input_params.get('power_factor', 0):.3f}</td></tr>
+        </table>
+        
+        <h2>🏆 综合评价</h2>
+        <div class="highlight">
+            <p><strong>总体评级：</strong>{calculations.get('quality_rating', '未知')} {calculations.get('quality_icon', '')}</p>
+            <ul>
+                <li><strong>PPE (光合光子效率)：</strong>{calculations.get('ppe', 0):.3f} μmol/J</li>
+                <li><strong>PAR占比：</strong>{calculations.get('par_ratio', 0)*100:.1f}%</li>
+                <li><strong>R/B比：</strong>{calculations.get('r_b_ratio', 0):.2f}</li>
+                <li><strong>光能比：</strong>{calculations.get('light_energy_ratio', 0):.3f}</li>
+            </ul>
+        </div>
+        
+        <h2>🌈 光谱分布数据</h2>
+        <table>
+            <tr><th>光谱波段</th><th>波长范围</th><th>积分值</th><th>占比</th></tr>
+            <tr><td>蓝光</td><td>400-500 nm</td><td>{calculations.get('blue_integration', 0):.2f}</td><td>{percentages.get('blue_percentage', 0):.1f}%</td></tr>
+            <tr><td>绿光</td><td>500-600 nm</td><td>{calculations.get('green_integration', 0):.2f}</td><td>{percentages.get('green_percentage', 0):.1f}%</td></tr>
+            <tr><td>红光</td><td>600-700 nm</td><td>{calculations.get('red_integration', 0):.2f}</td><td>{percentages.get('red_percentage', 0):.1f}%</td></tr>
+            <tr><td>远红光</td><td>700-800 nm</td><td>{calculations.get('far_red_integration', 0):.2f}</td><td>{percentages.get('far_red_percentage', 0):.1f}%</td></tr>
+        </table>
+        
+        <h2>💡 光谱优化建议</h2>
+        <ul>
+    """
+    
+    suggestions = calculations.get('optimization_suggestions', [])
+    for suggestion in suggestions:
+        html_content += f"<li>{suggestion}</li>"
+    
+    html_content += """
+        </ul>
+        
+        <h2>📖 分析方法说明</h2>
+        <p><strong>核心计算公式：</strong></p>
+        <ul>
+            <li>光能比 = 光合有效积分 ÷ 总积分</li>
+            <li>总光子通量 = 总辐射通量 × 光能比 (μmol/s)</li>
+            <li>PPE = 总光子通量 ÷ 总功率 (μmol/J)</li>
+        </ul>
+        
+        <footer style="text-align: center; margin-top: 40px; padding: 20px; border-top: 1px solid #ddd;">
+            <p>LED植物照明光学度量体系分析系统 | 基于四种光学度量体系</p>
+        </footer>
+    </body>
+    </html>
+    """
+    
+    return html_content.encode('utf-8')
+
+def generate_chart_images(results, df_clean):
+    """生成图表图片用于PDF报告"""
+    chart_images = {}
+    
+    # 验证输入数据
+    if not results or not isinstance(results, dict):
+        raise ValueError("分析结果数据不完整，无法生成图表")
+    
+    if df_clean is None or df_clean.empty:
+        raise ValueError("光谱数据为空，无法生成图表")
+    
+    # 获取必要的数据
+    calculations = results.get('calculations', {})
+    percentages = results.get('percentages', {})
+    
+    print(f"图表生成数据验证：")
+    print(f"- 光谱数据点数: {len(df_clean)}")
+    print(f"- 计算结果数量: {len(calculations)}")
+    print(f"- 百分比数据数量: {len(percentages)}")
+    
+    try:
+        # 首先确保导入必需的库
+        from matplotlib import pyplot as plt
+        import matplotlib.font_manager as fm
+        import platform
+        import os
+        
+        # 设置matplotlib中文字体 - 增强版本
+        # 寻找系统中可用的中文字体
+        chinese_fonts = []
+        system = platform.system()
+        
+        if system == "Windows":
+            # Windows常见中文字体路径
+            potential_fonts = [
+                'C:/Windows/Fonts/simhei.ttf',     # 黑体
+                'C:/Windows/Fonts/simsun.ttc',     # 宋体
+                'C:/Windows/Fonts/msyh.ttc',       # 微软雅黑
+                'C:/Windows/Fonts/simkai.ttf',     # 楷体
+                'C:/Windows/Fonts/simfang.ttf'     # 仿宋
+            ]
+            font_names = ['SimHei', 'SimSun', 'Microsoft YaHei', 'KaiTi', 'FangSong']
+        elif system == "Darwin":  # macOS
+            potential_fonts = [
+                '/System/Library/Fonts/PingFang.ttc',
+                '/System/Library/Fonts/STSong.ttc',
+                '/System/Library/Fonts/STHeiti Light.ttc',
+                '/System/Library/Fonts/STKaiti.ttc',
+                '/System/Library/Fonts/STFangsong.ttc'
+            ]
+            font_names = ['PingFang SC', 'STSong', 'STHeiti', 'STKaiti', 'STFangsong']
+        else:  # Linux
+            potential_fonts = [
+                '/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf',
+                '/usr/share/fonts/truetype/wqy/wqy-microhei.ttc',
+                '/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc',
+                '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc'
+            ]
+            font_names = ['Droid Sans Fallback', 'WenQuanYi Micro Hei', 'WenQuanYi Zen Hei', 'Noto Sans CJK']
+        
+        # 检查字体文件是否存在并添加到matplotlib
+        for font_path, font_name in zip(potential_fonts, font_names):
+            if os.path.exists(font_path):
+                try:
+                    # 添加字体到matplotlib
+                    fm.fontManager.addfont(font_path)
+                    chinese_fonts.append(font_name)
+                except Exception as e:
+                    print(f"无法添加字体 {font_name}: {e}")
+                    continue
+        
+        # 设置matplotlib字体
+        try:
+            if chinese_fonts:
+                plt.rcParams['font.sans-serif'] = chinese_fonts + ['DejaVu Sans', 'Arial']
+                print(f"成功加载中文字体: {chinese_fonts}")
+            else:
+                # 如果没有找到中文字体，尝试使用系统内置的
+                plt.rcParams['font.sans-serif'] = ['SimHei', 'PingFang SC', 'DejaVu Sans', 'Arial']
+                print("使用系统默认字体设置")
+            
+            plt.rcParams['axes.unicode_minus'] = False  # 解决负号显示问题
+            
+            # 测试中文字体是否可用
+            current_font = plt.rcParams['font.sans-serif'][0]
+            print(f"当前使用的字体: {current_font}")
+            
+        except Exception as e:
+            print(f"字体设置失败，使用默认设置: {e}")
+            # 使用最基本的设置
+            plt.rcParams['font.sans-serif'] = ['DejaVu Sans', 'Arial']
+            plt.rcParams['axes.unicode_minus'] = False
+        
+        # 1. 光谱分布图（彩虹图谱）
+        fig, ax = plt.subplots(figsize=(12, 6))
+        wavelengths = df_clean['wavelength'].values
+        radiations = df_clean['radiation'].values
+        
+        # 验证光谱数据
+        if len(wavelengths) == 0 or len(radiations) == 0:
+            raise ValueError("光谱数据为空")
+        
+        print(f"光谱图数据：波长范围 {wavelengths.min():.1f}-{wavelengths.max():.1f} nm，{len(wavelengths)} 个数据点")
+        
+        # 创建彩虹色谱效果
+        def wavelength_to_rgb(wavelength):
+            """将波长转换为RGB颜色值 (基于可见光谱)"""
+            if wavelength < 380:
+                return (0.5, 0.0, 1.0)  # 紫外线区域显示为紫色
+            elif wavelength < 440:
+                # 紫到蓝
+                t = (wavelength - 380) / (440 - 380)
+                return (0.5 - 0.5*t, 0.0, 1.0)
+            elif wavelength < 490:
+                # 蓝到青
+                t = (wavelength - 440) / (490 - 440)
+                return (0.0, t, 1.0)
+            elif wavelength < 510:
+                # 青到绿
+                t = (wavelength - 490) / (510 - 490)
+                return (0.0, 1.0, 1.0 - t)
+            elif wavelength < 580:
+                # 绿到黄
+                t = (wavelength - 510) / (580 - 510)
+                return (t, 1.0, 0.0)
+            elif wavelength < 645:
+                # 黄到橙
+                t = (wavelength - 580) / (645 - 580)
+                return (1.0, 1.0 - 0.5*t, 0.0)
+            elif wavelength < 750:
+                # 橙到红
+                t = (wavelength - 645) / (750 - 645)
+                return (1.0, 0.5 - 0.5*t, 0.0)
+            else:
+                # 红外线区域显示为深红
+                return (0.5, 0.0, 0.0)
+        
+        # 创建连续的彩虹填充效果
+        step = 5  # 每5nm一个颜色段
+        min_wave = int(wavelengths.min())
+        max_wave = int(wavelengths.max())
+        
+        # 按小段创建填充，每段使用对应的光谱颜色
+        for wave_start in range(min_wave, max_wave, step):
+            wave_end = min(wave_start + step, max_wave)
+            
+            # 筛选该波长范围内的数据
+            mask = (wavelengths >= wave_start) & (wavelengths < wave_end)
+            if np.any(mask):
+                range_waves = wavelengths[mask]
+                range_rads = radiations[mask]
+                
+                if len(range_waves) > 0:
+                    # 计算该范围的中心波长用于颜色映射
+                    center_wave = (wave_start + wave_end) / 2
+                    r, g, b = wavelength_to_rgb(center_wave)
+                    color = f'rgba({int(r*255)}, {int(g*255)}, {int(b*255)}, 0.8)'
+                    
+                    # 创建填充区域
+                    ax.fill_between(range_waves, range_rads, alpha=0.8, color=(r, g, b))
+        
+        # 添加整体光谱线条作为轮廓
+        ax.plot(wavelengths, radiations, color='black', linewidth=1.5, alpha=0.7)
+        
+        # 设置坐标轴和标题
+        ax.set_xlabel('波长 (nm)', fontsize=12, fontweight='bold')
+        ax.set_ylabel('辐射强度', fontsize=12, fontweight='bold')
+        ax.set_title('LED光谱分布图 (彩虹色谱)', fontsize=14, fontweight='bold')
+        ax.grid(True, alpha=0.3)
+        
+        # 添加波段标记
+        bands = [(400, 500, '蓝光'), (500, 600, '绿光'), (600, 700, '红光'), (700, 800, '远红光')]
+        band_colors = ['blue', 'green', 'red', 'maroon']
+        
+        for i, (start, end, label) in enumerate(bands):
+            mask = (wavelengths >= start) & (wavelengths < end)
+            if np.any(mask):
+                center = (start + end) / 2
+                max_y = radiations[mask].max() if len(radiations[mask]) > 0 else radiations.max() * 0.8
+                # 添加半透明的波段标记
+                ax.axvspan(start, end, alpha=0.1, color=band_colors[i])
+                ax.text(center, max_y * 1.1, label, ha='center', va='bottom', 
+                       fontsize=11, fontweight='bold',
+                       bbox=dict(boxstyle="round,pad=0.3", facecolor='white', alpha=0.8, edgecolor=band_colors[i]))
+        
+        plt.tight_layout()
+        
+        # 保存为字节流
+        img_buffer = io.BytesIO()
+        plt.savefig(img_buffer, format='png', dpi=300, bbox_inches='tight', 
+                   facecolor='white', edgecolor='none')
+        img_buffer.seek(0)
+        chart_images['spectrum'] = img_buffer
+        plt.close()
+        print("✅ 彩虹光谱分布图生成完成")
+        
+        # 2. 光质分布饼图
+        fig, ax = plt.subplots(figsize=(10, 8))
+        percentages = results.get('percentages', {})
+        
+        # 验证百分比数据
+        required_percentages = ['blue_percentage', 'green_percentage', 'red_percentage', 'far_red_percentage']
+        missing_data = [key for key in required_percentages if key not in percentages]
+        if missing_data:
+            print(f"警告：缺少百分比数据 {missing_data}")
+        
+        labels = ['蓝光\n(400-500nm)', '绿光\n(500-600nm)', '红光\n(600-700nm)', '远红光\n(700-800nm)']
+        sizes = [
+            percentages.get('blue_percentage', 0),
+            percentages.get('green_percentage', 0),
+            percentages.get('red_percentage', 0),
+            percentages.get('far_red_percentage', 0)
+        ]
+        
+        print(f"饼图数据：蓝光{sizes[0]:.1f}%, 绿光{sizes[1]:.1f}%, 红光{sizes[2]:.1f}%, 远红光{sizes[3]:.1f}%")
+        
+        colors_pie = ['#4285F4', '#34A853', '#EA4335', '#FB04DA']
+        
+        wedges, texts, autotexts = ax.pie(sizes, labels=labels, colors=colors_pie, autopct='%1.1f%%',
+                                         startangle=90, textprops={'fontsize': 11, 'fontweight': 'bold'})
+        
+        # 确保饼图标签使用正确字体
+        for text in texts:
+            text.set_fontweight('bold')
+        for autotext in autotexts:
+            autotext.set_color('white')
+            autotext.set_fontweight('bold')
+            autotext.set_fontsize(10)
+            
+        ax.set_title('光质分布占比', fontsize=16, fontweight='bold', pad=20)
+        
+        plt.tight_layout()
+        
+        img_buffer = io.BytesIO()
+        plt.savefig(img_buffer, format='png', dpi=300, bbox_inches='tight',
+                   facecolor='white', edgecolor='none')
+        img_buffer.seek(0)
+        chart_images['pie'] = img_buffer
+        plt.close()
+        print("✅ 光质分布饼图生成完成")
+        
+        # 3. 作物适应性雷达图
+        fig, ax = plt.subplots(figsize=(10, 8), subplot_kw=dict(projection='polar'))
+        
+        crop_suitability = results.get('calculations', {}).get('crop_suitability', {})
+        categories = list(crop_suitability.keys())
+        values = list(crop_suitability.values())
+        
+        print(f"雷达图数据：{len(categories)} 个作物类型")
+        for cat, val in zip(categories, values):
+            print(f"  {cat}: {val}分")
+        
+        if categories and values:
+            # 闭合雷达图
+            angles = np.linspace(0, 2 * np.pi, len(categories), endpoint=False).tolist()
+            values += values[:1]  # 闭合
+            angles += angles[:1]  # 闭合
+            
+            ax.plot(angles, values, 'o-', linewidth=3, color='#4285F4', markersize=8)
+            ax.fill(angles, values, alpha=0.25, color='#4285F4')
+            ax.set_xticks(angles[:-1])
+            ax.set_xticklabels(categories, fontsize=12, fontweight='bold')
+            ax.set_ylim(0, 100)
+            ax.set_yticks([20, 40, 60, 80, 100])
+            ax.set_yticklabels(['20', '40', '60', '80', '100'], fontsize=10, fontweight='bold')
+            ax.set_title('作物适应性评价', fontsize=16, fontweight='bold', pad=30)
+            ax.grid(True, alpha=0.6)
+            
+            # 设置网格线样式
+            ax.grid(True, linestyle='--', alpha=0.7)
+        else:
+            ax.text(0.5, 0.5, '无作物适应性数据', transform=ax.transAxes, 
+                   ha='center', va='center', fontsize=14)
+        
+        plt.tight_layout()
+        
+        img_buffer = io.BytesIO()
+        plt.savefig(img_buffer, format='png', dpi=300, bbox_inches='tight',
+                   facecolor='white', edgecolor='none')
+        img_buffer.seek(0)
+        chart_images['radar'] = img_buffer
+        plt.close()
+        print("✅ 作物适应性雷达图生成完成")
+        
+        print(f"\n🎯 所有图表生成完成，共生成 {len(chart_images)} 个图表文件")
+        
+    except Exception as e:
+        st.error(f"生成图表时出错: {str(e)}")
+        # 如果生成图表失败，返回空字典
+        chart_images = {}
+        
+        # 尝试清理可能存在的图形对象
+        try:
+            import matplotlib.pyplot as plt
+            plt.close('all')  # 关闭所有可能打开的图形
+        except:
+            pass
+    
+    return chart_images
+
+def generate_pdf_report(results, df_clean):
+    """生成PDF格式的分析报告"""
+    
+    # 验证输入数据的完整性
+    if not results or not isinstance(results, dict):
+        raise ValueError("分析结果数据不完整，无法生成PDF报告")
+    
+    if df_clean is None or df_clean.empty:
+        raise ValueError("光谱数据不完整，无法生成PDF报告")
+    
+    # 验证核心数据是否存在
+    calculations = results.get('calculations', {})
+    percentages = results.get('percentages', {})
+    basic_info = results.get('basic_info', {})
+    input_params = results.get('input_params', {})
+    
+    if not calculations:
+        raise ValueError("计算结果为空，无法生成PDF报告")
+    
+    print(f"PDF报告数据验证通过：")
+    print(f"- 计算结果项目数: {len(calculations)}")
+    print(f"- 百分比数据项目数: {len(percentages)}")
+    print(f"- 光谱数据行数: {len(df_clean)}")
+    
+    # 创建字节流
+    buffer = io.BytesIO()
+    
+    # 创建PDF文档
+    doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=0.5*inch, bottomMargin=0.5*inch)
+    
+    # 获取样式
+    styles = getSampleStyleSheet()
+    
+    # 注册中文字体（使用系统自带字体）
+    chinese_font = 'Helvetica'  # 默认字体
+    try:
+        import platform
+        from reportlab.pdfbase import pdfmetrics
+        from reportlab.pdfbase.ttfonts import TTFont
+        import os
+        
+        system = platform.system()
+        
+        if system == "Windows":
+            # Windows系统尝试多种中文字体
+            font_paths = [
+                'C:/Windows/Fonts/simhei.ttf',  # 黑体
+                'C:/Windows/Fonts/simsun.ttc',  # 宋体
+                'C:/Windows/Fonts/msyh.ttc',    # 微软雅黑
+                'C:/Windows/Fonts/simkai.ttf'   # 楷体
+            ]
+            for font_path in font_paths:
+                if os.path.exists(font_path):
+                    try:
+                        if font_path.endswith('.ttf'):
+                            pdfmetrics.registerFont(TTFont('ChineseFont', font_path))
+                        else:  # .ttc files
+                            pdfmetrics.registerFont(TTFont('ChineseFont', font_path, subfontIndex=0))
+                        chinese_font = 'ChineseFont'
+                        break
+                    except Exception as e:
+                        continue
+                        
+        elif system == "Darwin":  # macOS
+            # macOS系统尝试多种中文字体
+            font_paths = [
+                '/System/Library/Fonts/PingFang.ttc',
+                '/System/Library/Fonts/STSong.ttc',
+                '/System/Library/Fonts/STHeiti Light.ttc',
+                '/System/Library/Fonts/STKaiti.ttc'
+            ]
+            for font_path in font_paths:
+                if os.path.exists(font_path):
+                    try:
+                        pdfmetrics.registerFont(TTFont('ChineseFont', font_path, subfontIndex=0))
+                        chinese_font = 'ChineseFont'
+                        break
+                    except Exception as e:
+                        continue
+                        
+        else:  # Linux系统
+            # Linux系统尝试常见中文字体路径
+            font_paths = [
+                '/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf',
+                '/usr/share/fonts/truetype/wqy/wqy-microhei.ttc',
+                '/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc',
+                '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc'
+            ]
+            for font_path in font_paths:
+                if os.path.exists(font_path):
+                    try:
+                        if font_path.endswith('.ttf'):
+                            pdfmetrics.registerFont(TTFont('ChineseFont', font_path))
+                        else:
+                            pdfmetrics.registerFont(TTFont('ChineseFont', font_path, subfontIndex=0))
+                        chinese_font = 'ChineseFont'
+                        break
+                    except Exception as e:
+                        continue
+                        
+    except Exception as e:
+        print(f"字体注册失败，使用默认字体: {str(e)}")
+        chinese_font = 'Helvetica'
+    
+    # 创建自定义样式（支持中文）
+    title_style = ParagraphStyle(
+        'CustomTitle',
+        parent=styles['Heading1'],
+        fontSize=18,
+        spaceAfter=30,
+        alignment=1,  # 居中
+        textColor=colors.darkblue,
+        fontName=chinese_font
+    )
+    
+    heading_style = ParagraphStyle(
+        'CustomHeading',
+        parent=styles['Heading2'],
+        fontSize=14,
+        spaceAfter=12,
+        textColor=colors.darkblue,
+        fontName=chinese_font
+    )
+    
+    subheading_style = ParagraphStyle(
+        'CustomSubHeading',
+        parent=styles['Heading3'],
+        fontSize=12,
+        spaceAfter=8,
+        textColor=colors.darkgreen,
+        fontName=chinese_font
+    )
+    
+    normal_style = ParagraphStyle(
+        'CustomNormal',
+        parent=styles['Normal'],
+        fontSize=10,
+        spaceAfter=6,
+        fontName=chinese_font
+    )
+    
+    # 内容列表
+    story = []
+    
+    # 标题
+    title = Paragraph("LED植物照明光学度量体系分析报告", title_style)
+    story.append(title)
+    story.append(Spacer(1, 20))
+    
+    # 报告生成时间
+    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    time_para = Paragraph(f"报告生成时间：{current_time}", normal_style)
+    story.append(time_para)
+    story.append(Spacer(1, 20))
+    
+    # 基本信息
+    story.append(Paragraph("测试基本信息", heading_style))
+    
+    basic_info = results.get('basic_info', {})
+    input_params = results.get('input_params', {})
+    
+    basic_data = [
+        ['项目', '数值'],
+        ['灯具型号', basic_info.get('lamp_model', '未填写')],
+        ['制造商/单位', basic_info.get('manufacturer', '未填写')],
+        ['测试日期', basic_info.get('test_date', '未填写')],
+        ['总辐射通量', f"{input_params.get('total_radiation_flux', 0):.1f} W"],
+        ['总功率', f"{input_params.get('total_power', 0):.1f} W"],
+        ['后面板温度', f"{input_params.get('back_panel_temp', 0):.1f} ℃"],
+        ['功率因数', f"{input_params.get('power_factor', 0):.3f}"]
+    ]
+    
+    basic_table = Table(basic_data, colWidths=[2*inch, 3*inch])
+    basic_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('FONTNAME', (0, 0), (-1, -1), chinese_font),  # 使用中文字体
+        ('FONTSIZE', (0, 0), (-1, 0), 12),
+        ('FONTSIZE', (0, 1), (-1, -1), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black)
+    ]))
+    
+    story.append(basic_table)
+    story.append(Spacer(1, 20))
+    
+    # 综合评价
+    story.append(Paragraph("综合评价", heading_style))
+    
+    calculations = results.get('calculations', {})
+    
+    # 综合评价表格
+    eval_data = [
+        ['评价项目', '数值', '等级'],
+        ['总体评级', f"{calculations.get('quality_rating', '未知')}", ''],
+        ['PPE (光合光子效率)', f"{calculations.get('ppe', 0):.3f} μmol/J", 
+         "优秀" if calculations.get('ppe', 0) > 2.5 else "良好" if calculations.get('ppe', 0) > 2.0 else "一般"],
+        ['PAR占比', f"{calculations.get('par_ratio', 0)*100:.1f}%", 
+         "优秀" if calculations.get('par_ratio', 0) > 0.8 else "良好" if calculations.get('par_ratio', 0) > 0.6 else "一般"],
+        ['R/B比', f"{calculations.get('r_b_ratio', 0):.2f}", 
+         "适宜" if 0.5 <= calculations.get('r_b_ratio', 0) <= 3.0 else "偏离"],
+        ['光能比', f"{calculations.get('light_energy_ratio', 0):.3f}", 
+         "高效" if calculations.get('light_energy_ratio', 0) > 0.5 else "中等" if calculations.get('light_energy_ratio', 0) > 0.3 else "低效"]
+    ]
+    
+    eval_table = Table(eval_data, colWidths=[2*inch, 2*inch, 1.5*inch])
+    eval_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, -1), chinese_font),
+        ('FONTSIZE', (0, 0), (-1, 0), 10),
+        ('FONTSIZE', (0, 1), (-1, -1), 9),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black)
+    ]))
+    
+    story.append(eval_table)
+    story.append(Spacer(1, 20))
+    
+    # 核心性能指标
+    story.append(Paragraph("核心性能指标", heading_style))
+    
+    performance_data = [
+        ['指标', '数值', '单位', '说明'],
+        ['总光子通量', f"{calculations.get('total_photon_flux', 0):.2f}", 'μmol/s', '总辐射通量×光能比'],
+        ['PAR功率', f"{calculations.get('par_power', 0):.2f}", 'W', 'PAR波段(400-700nm)功率'],
+        ['光效', f"{calculations.get('luminous_efficacy', 0):.3f}", 'W/W', '辐射光效'],
+        ['估算PPFD', f"{calculations.get('ppfd_estimated', 0):.0f}", 'μmol/m²/s', '假设1m²面积的光强'],
+        ['光能利用效率', f"{calculations.get('light_energy_efficiency', 0)*100:.1f}", '%', 'PAR功率占总功率比例'],
+        ['热损失率', f"{calculations.get('heat_loss_rate', 0)*100:.1f}", '%', '转化为热量的功率比例'],
+        ['年度电费', f"{calculations.get('annual_electricity_cost', 0):.0f}", '元', '按12小时/天运行估算']
+    ]
+    
+    performance_table = Table(performance_data, colWidths=[1.5*inch, 1.2*inch, 0.8*inch, 2*inch])
+    performance_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, -1), chinese_font),
+        ('FONTSIZE', (0, 0), (-1, 0), 9),
+        ('FONTSIZE', (0, 1), (-1, -1), 8),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black)
+    ]))
+    
+    story.append(performance_table)
+    story.append(PageBreak())
+    
+    # 生成图表
+    chart_images = generate_chart_images(results, df_clean)
+    
+    # 添加光谱分布图（修复长宽比）
+    if 'spectrum' in chart_images:
+        story.append(Paragraph("光谱分布分析", heading_style))
+        chart_images['spectrum'].seek(0)
+        
+        # 获取图片实际尺寸并保持长宽比
+        try:
+            from PIL import Image as PILImage
+            pil_img = PILImage.open(chart_images['spectrum'])
+            original_width, original_height = pil_img.size
+            
+            # 设置最大宽度为6英寸，按比例计算高度
+            max_width = 6 * inch
+            aspect_ratio = original_height / original_width
+            img_height = max_width * aspect_ratio
+            
+            # 如果高度过大，限制高度并重新计算宽度
+            max_height = 4 * inch
+            if img_height > max_height:
+                img_height = max_height
+                img_width = img_height / aspect_ratio
+            else:
+                img_width = max_width
+            
+            # 重置流位置
+            chart_images['spectrum'].seek(0)
+            img = Image(chart_images['spectrum'], width=img_width, height=img_height)
+            story.append(img)
+            story.append(Spacer(1, 20))
+            
+        except ImportError:
+            # 如果PIL不可用，使用默认尺寸
+            chart_images['spectrum'].seek(0)
+            img = Image(chart_images['spectrum'], width=6*inch, height=3*inch)
+            story.append(img)
+            story.append(Spacer(1, 20))
+        except Exception as e:
+            story.append(Paragraph(f"光谱图加载失败: {str(e)}", normal_style))
+            story.append(Spacer(1, 20))
+    
+    # 光谱分布数据表
+    story.append(Paragraph("光谱分布数据", subheading_style))
+    
+    percentages = results.get('percentages', {})
+    spectrum_data = [
+        ['光谱波段', '波长范围', '积分值', '占比', '特性'],
+        ['蓝光', '400-500 nm', f"{calculations.get('blue_integration', 0):.2f}", 
+         f"{percentages.get('blue_percentage', 0):.1f}%", '促进叶绿素合成'],
+        ['绿光', '500-600 nm', f"{calculations.get('green_integration', 0):.2f}", 
+         f"{percentages.get('green_percentage', 0):.1f}%", '光合效率较低'],
+        ['红光', '600-700 nm', f"{calculations.get('red_integration', 0):.2f}", 
+         f"{percentages.get('red_percentage', 0):.1f}%", '促进开花结果'],
+        ['远红光', '700-800 nm', f"{calculations.get('far_red_integration', 0):.2f}", 
+         f"{percentages.get('far_red_percentage', 0):.1f}%", '调节茎伸长']
+    ]
+    
+    spectrum_table = Table(spectrum_data, colWidths=[1.2*inch, 1.2*inch, 1.2*inch, 1*inch, 1.4*inch])
+    spectrum_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, -1), chinese_font),
+        ('FONTSIZE', (0, 0), (-1, 0), 9),
+        ('FONTSIZE', (0, 1), (-1, -1), 8),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black)
+    ]))
+    
+    story.append(spectrum_table)
+    story.append(Spacer(1, 20))
+    
+    # 添加光质分布饼图（修复长宽比）
+    if 'pie' in chart_images:
+        story.append(Paragraph("光质分布占比", subheading_style))
+        chart_images['pie'].seek(0)
+        
+        # 获取饼图实际尺寸并保持长宽比
+        try:
+            from PIL import Image as PILImage
+            pil_img = PILImage.open(chart_images['pie'])
+            original_width, original_height = pil_img.size
+            
+            # 饼图通常是正方形，设置合适的尺寸
+            img_size = 4 * inch
+            aspect_ratio = original_height / original_width
+            
+            if aspect_ratio > 1:  # 高度大于宽度
+                img_height = img_size
+                img_width = img_size / aspect_ratio
+            else:  # 宽度大于等于高度
+                img_width = img_size
+                img_height = img_size * aspect_ratio
+            
+            # 重置流位置
+            chart_images['pie'].seek(0)
+            img = Image(chart_images['pie'], width=img_width, height=img_height)
+            story.append(img)
+            story.append(Spacer(1, 20))
+            
+        except ImportError:
+            # 如果PIL不可用，使用默认尺寸
+            chart_images['pie'].seek(0)
+            img = Image(chart_images['pie'], width=4*inch, height=4*inch)
+            story.append(img)
+            story.append(Spacer(1, 20))
+        except Exception as e:
+            story.append(Paragraph(f"饼图加载失败: {str(e)}", normal_style))
+            story.append(Spacer(1, 20))
+    
+    # 植物生理响应指标
+    story.append(Paragraph("植物生理响应指标", heading_style))
+    
+    physio_data = [
+        ['指标', '数值', '作用机制', '影响'],
+        ['隐花色素活性', f"{calculations.get('crypto_activity', 0):.3f}", '感受蓝光和UV-A', '调节向光性和生物钟'],
+        ['光敏色素活性', f"{calculations.get('phyto_activity', 0):.3f}", '感受红光/远红光', '调节光周期响应'],
+        ['花青素合成指数', f"{calculations.get('anthocyanin_index', 0):.3f}", '紫光和蓝光诱导', '提高抗逆性和着色'],
+        ['叶绿素合成指数', f"{calculations.get('chlorophyll_synthesis', 0):.3f}", '红蓝光协同作用', '促进光合色素形成']
+    ]
+    
+    physio_table = Table(physio_data, colWidths=[1.5*inch, 1*inch, 1.8*inch, 1.7*inch])
+    physio_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('FONTNAME', (0, 0), (-1, -1), chinese_font),
+        ('FONTSIZE', (0, 0), (-1, 0), 9),
+        ('FONTSIZE', (0, 1), (-1, -1), 8),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black)
+    ]))
+    
+    story.append(physio_table)
+    story.append(PageBreak())
+    
+    # 添加作物适应性雷达图（修复长宽比）
+    if 'radar' in chart_images:
+        story.append(Paragraph("作物适应性评价", heading_style))
+        chart_images['radar'].seek(0)
+        
+        # 雷达图通常也接近正方形
+        try:
+            from PIL import Image as PILImage
+            pil_img = PILImage.open(chart_images['radar'])
+            original_width, original_height = pil_img.size
+            
+            img_size = 4.5 * inch
+            aspect_ratio = original_height / original_width
+            
+            if aspect_ratio > 1:
+                img_height = img_size
+                img_width = img_size / aspect_ratio
+            else:
+                img_width = img_size
+                img_height = img_size * aspect_ratio
+            
+            # 重置流位置
+            chart_images['radar'].seek(0)
+            img = Image(chart_images['radar'], width=img_width, height=img_height)
+            story.append(img)
+            story.append(Spacer(1, 20))
+            
+        except ImportError:
+            # 如果PIL不可用，使用默认尺寸
+            chart_images['radar'].seek(0)
+            img = Image(chart_images['radar'], width=4.5*inch, height=4.5*inch)
+            story.append(img)
+            story.append(Spacer(1, 20))
+        except Exception as e:
+            story.append(Paragraph(f"雷达图加载失败: {str(e)}", normal_style))
+            story.append(Spacer(1, 20))
+    
+    # 作物适应性数据表
+    crop_suitability = calculations.get('crop_suitability', {})
+    crop_data = [['作物类型', '适应性评分', '评价等级', '推荐应用']]
+    
+    crop_recommendations = {
+        '叶菜类': '生菜、菠菜、小白菜、芹菜',
+        '果菜类': '番茄、黄瓜、辣椒、茄子',
+        '育苗专用': '各类蔬菜育苗、花卉育苗'
+    }
+    
+    for crop_type, score in crop_suitability.items():
+        if score >= 80:
+            level = "优秀"
+        elif score >= 60:
+            level = "良好"
+        else:
+            level = "一般"
+        recommendation = crop_recommendations.get(crop_type, '通用')
+        crop_data.append([crop_type, f"{score}分", level, recommendation])
+    
+    crop_table = Table(crop_data, colWidths=[1.5*inch, 1.2*inch, 1*inch, 2.3*inch])
+    crop_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, -1), chinese_font),
+        ('FONTSIZE', (0, 0), (-1, 0), 9),
+        ('FONTSIZE', (0, 1), (-1, -1), 8),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black)
+    ]))
+    
+    story.append(crop_table)
+    story.append(Spacer(1, 20))
+    
+    # 生长阶段适配性
+    story.append(Paragraph("生长阶段适配性分析", heading_style))
+    
+    growth_stages = calculations.get('growth_stage_suitability', {})
+    if growth_stages:
+        growth_data = [['生长阶段', '适配性评分', '光谱特点需求']]
+        
+        stage_requirements = {
+            '发芽期': '适量蓝光和红光，促进发芽',
+            '苗期': '高蓝光比例，控制徒长',
+            '营养生长期': '平衡红蓝光，促进叶片发育',
+            '开花期': '高红光比例，促进花芽分化',
+            '结果期': '均衡光谱，高光强需求'
+        }
+        
+        for stage, score in growth_stages.items():
+            requirement = stage_requirements.get(stage, '平衡光谱')
+            growth_data.append([stage, f"{score}分", requirement])
+        
+        growth_table = Table(growth_data, colWidths=[1.5*inch, 1.5*inch, 3*inch])
+        growth_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, -1), chinese_font),
+            ('FONTSIZE', (0, 0), (-1, 0), 9),
+            ('FONTSIZE', (0, 1), (-1, -1), 8),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+        ]))
+        
+        story.append(growth_table)
+        story.append(Spacer(1, 20))
+    
+    # 优化建议
+    story.append(Paragraph("光谱优化建议", heading_style))
+    
+    suggestions = calculations.get('optimization_suggestions', [])
+    if len(suggestions) == 1 and "较为合理" in suggestions[0]:
+        suggestion_text = f"✓ {suggestions[0]}"
+    else:
+        suggestion_text = "检测到以下可优化项目：<br/>"
+        for i, suggestion in enumerate(suggestions, 1):
+            suggestion_text += f"{i}. {suggestion}<br/>"
+    
+    story.append(Paragraph(suggestion_text, normal_style))
+    story.append(Spacer(1, 20))
+    
+    # 详细计算数据
+    story.append(Paragraph("详细计算数据", heading_style))
+    
+    calculation_data = [
+        ['计算项目', '数值', '计算公式/说明'],
+        ['光合有效积分', f"{calculations.get('photosynthetic_active', 0):.2f}", 'Σ(λ×辐射)/119.8'],
+        ['总积分', f"{calculations.get('total_integration', 0):.2f}", 'Σ辐射值'],
+        ['PAR积分', f"{calculations.get('par_integration', 0):.2f}", '400-700nm辐射值总和'],
+        ['R/Fr比', f"{calculations.get('r_fr_ratio', 0):.2f}", '红光积分/远红光积分'],
+        ['UV-A/B比', f"{calculations.get('uva_b_ratio', 0):.3f}", 'UV-A积分/蓝光积分'],
+        ['DLI', f"{calculations.get('dli', 0):.2f}", '总光子通量×12×3600/1000000 mol/m²/d']
+    ]
+    
+    calc_table = Table(calculation_data, colWidths=[2*inch, 1.5*inch, 2.5*inch])
+    calc_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('FONTNAME', (0, 0), (-1, -1), chinese_font),
+        ('FONTSIZE', (0, 0), (-1, 0), 9),
+        ('FONTSIZE', (0, 1), (-1, -1), 8),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black)
+    ]))
+    
+    story.append(calc_table)
+    story.append(Spacer(1, 20))
+    
+    # 分析方法说明
+    story.append(Paragraph("分析方法说明", heading_style))
+    
+    method_text = """
+    核心计算公式：<br/>
+    • 光能比 = 光合有效积分 ÷ 总积分<br/>
+    • 总光子通量 = 总辐射通量 × 光能比 (μmol/s)<br/>
+    • PPE = 总光子通量 ÷ 总功率 (μmol/J)<br/>
+    • 积分值 = (λ × 辐射) ÷ 119.8（光子能量转换常数）<br/>
+    <br/>
+    评价标准：<br/>
+    • PPE等级: 优秀(>2.5), 良好(2.0-2.5), 一般(<2.0) μmol/J<br/>
+    • PAR占比等级: 优秀(>80%), 良好(60-80%), 一般(<60%)<br/>
+    • R/B比值范围: 叶菜类(0.5-1.5), 果菜类(1.0-3.0)<br/>
+    • 光能比: 高效(>0.5), 中等(0.3-0.5), 低效(<0.3)<br/>
+    <br/>
+    技术特点：<br/>
+    本分析基于四种光学度量体系：辐射度学、光度学、光子度量学、植物光子度量学。<br/>
+    结合McCree (1972)植物光合敏感曲线，提供科学准确的LED植物照明评价。
+    """
+    
+    story.append(Paragraph(method_text, normal_style))
+    story.append(Spacer(1, 30))
+    
+    # 报告署名
+    footer_text = f"""
+    ————————————————————————————————————————————————————————————<br/>
+    LED植物照明光学度量体系分析系统<br/>
+    报告生成时间: {current_time}<br/>
+    技术支持: 基于科学光度量理论的专业分析工具<br/>
+    ————————————————————————————————————————————————————————————
+    """
+    
+    story.append(Paragraph(footer_text, normal_style))
+    
+    # 生成PDF
+    doc.build(story)
+    
+    # 获取PDF数据
+    buffer.seek(0)
+    pdf_data = buffer.read()
+    buffer.close()
+    
+    return pdf_data
+
+def create_downloadable_report(results, df_clean, filename="LED_Plant_Analysis_Report"):
+    """创建可下载的报告文件"""
+    if PDF_AVAILABLE:
+        # 生成PDF报告
+        return generate_pdf_report(results, df_clean), "application/pdf", filename + ".pdf"
+    else:
+        # 生成简化的HTML报告
+        return generate_simplified_report(results, df_clean), "text/html", filename + ".html"
 
 def main():
     # 设置页面配置
@@ -45,11 +1060,90 @@ def main():
     # 主标题
     st.markdown('<h1 class="main-header">🌱 LED植物照明光学度量体系分析系统</h1>', unsafe_allow_html=True)
     
-    # 侧边栏 - 理论基础
+    # 侧边栏 - 使用说明（移到最上面）
     with st.sidebar:
+        st.header("📖 使用说明")
+        
+        with st.expander("💡 快速开始", expanded=True):
+            st.markdown("""
+            **第一步：准备数据**
+            - 准备LED光谱测试数据文件（CSV/Excel格式）
+            - 确保文件包含波长(nm)和辐射强度两列数据
+            - 推荐波长范围：380-800nm
+            
+            **第二步：输入参数**
+            - 输入测试灯具的总辐射通量(W)
+            - 输入测试灯具的总功率(W)
+            - 输入后面板温度(℃)和功率因数
+            
+            **第三步：上传文件**
+            - 点击文件上传按钮选择光谱数据文件
+            - 系统会自动检查和清洗数据
+            - 查看数据预览确认格式正确
+            
+            **第四步：查看结果**
+            - 系统自动计算各项光学指标
+            - 查看综合评价和性能指标
+            - 参考优化建议改进光谱配置
+            """)
+        
+        with st.expander("📊 核心指标说明", expanded=False):
+            st.markdown("""
+            **PPE (光合光子效率)**
+            - 单位：μmol/J
+            - 计算：总光子通量 ÷ 总功率
+            - 评价标准：>2.5优秀，2.0-2.5良好，<2.0一般
+            
+            **PAR占比**
+            - 光合有效辐射(400-700nm)占总辐射的比例
+            - 评价标准：>80%优秀，60-80%良好，<60%一般
+            
+            **R/B比 (红蓝比)**
+            - 红光(600-700nm)与蓝光(400-500nm)的比值
+            - 叶菜类适宜范围：0.5-1.5
+            - 果菜类适宜范围：1.0-3.0
+            
+            **光能比**
+            - 光合有效积分与总积分的比值
+            - 反映光谱的光合有效性
+            """)
+        
+        with st.expander("🎯 应用场景", expanded=False):
+            st.markdown("""
+            **🥬 叶菜类栽培**
+            - 重点关注：高蓝光比例、适中红蓝比
+            - 推荐配置：蓝光>20%，R/B=0.5-1.5
+            
+            **🍅 果菜类栽培**
+            - 重点关注：高红光比例、适量远红光
+            - 推荐配置：红光>35%，R/B=1.0-3.0
+            
+            **🌱 育苗专用**
+            - 重点关注：高蓝光、适量UV-A
+            - 推荐配置：蓝光>25%，R/B=0.3-1.0
+            """)
+        
+        with st.expander("⚠️ 常见问题", expanded=False):
+            st.markdown("""
+            **数据格式错误**
+            - 检查文件是否为CSV或Excel格式
+            - 确保第1列为波长，第2列为辐射强度
+            - 删除表头和空行，确保数据从第1行开始
+            
+            **计算结果异常**
+            - 检查辐射通量和功率输入是否合理
+            - 确认光谱数据波长范围包含400-700nm
+            - 验证辐射强度数值为正数
+            
+            **光谱优化建议**
+            - PPE过低：增加光合有效光子输出比例
+            - PAR占比低：提高400-700nm波段比例
+            - 红蓝比不当：调整LED芯片配比
+            """)
+        
         st.header("📚 理论基础")
         
-        with st.expander("🔬 四种光学度量体系", expanded=True):
+        with st.expander("🔬 四种光学度量体系", expanded=False):
             st.markdown("""
             **1. 辐射度学 (Radiometry)**
             - 辐射通量 Φₑ (W)
@@ -119,6 +1213,33 @@ def main():
     # 输入参数部分
     st.header("1. 输入测试参数")
     
+    # 灯具基本信息
+    st.subheader("📋 灯具基本信息")
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        lamp_model = st.text_input(
+            "灯具型号", 
+            value="",
+            placeholder="例如：LED-PL-600W-V2.0",
+            help="输入待分析灯具的型号名称"
+        )
+    
+    with col2:
+        manufacturer = st.text_input(
+            "制造商/单位", 
+            value="",
+            placeholder="例如：某某科技有限公司",
+            help="输入灯具制造商或测试单位名称"
+        )
+    
+    with col3:
+        test_date = st.date_input(
+            "测试日期",
+            help="选择测试日期"
+        )
+    
+    st.subheader("⚡ 电气参数")
     col1, col2 = st.columns(2)
     
     with col1:
@@ -250,7 +1371,10 @@ def main():
                 st.dataframe(df.head(10))
                 
                 # 进行计算
-                results, df_clean = calculate_light_analysis(df, total_radiation_flux, total_power, back_panel_temp, power_factor)
+                results, df_clean = calculate_light_analysis(
+                    df, total_radiation_flux, total_power, back_panel_temp, power_factor,
+                    lamp_model, manufacturer, test_date
+                )
                 
                 # 检查计算结果是否有效
                 if results is not None and df_clean is not None:
@@ -267,7 +1391,7 @@ def main():
     else:
         st.info("请上传包含波长和辐射数据的文件")
 
-def calculate_light_analysis(df, total_radiation_flux, total_power, back_panel_temp, power_factor):
+def calculate_light_analysis(df, total_radiation_flux, total_power, back_panel_temp, power_factor, lamp_model, manufacturer, test_date):
     """计算光效分析结果"""
     
     # 显示原始数据信息
@@ -888,6 +2012,11 @@ def calculate_light_analysis(df, total_radiation_flux, total_power, back_panel_t
     quality_rating, quality_icon = evaluate_light_quality(ppe, par_ratio, r_b_ratio)
     
     results = {
+        'basic_info': {
+            'lamp_model': lamp_model,
+            'manufacturer': manufacturer,
+            'test_date': str(test_date)
+        },
         'input_params': {
             'total_radiation_flux': total_radiation_flux,
             'total_power': total_power,
@@ -995,6 +2124,43 @@ def display_results(results, df):
     # 输入参数展示区域
     st.subheader("📊 测试参数")
     
+    # 显示基本信息
+    basic_info = results.get('basic_info', {})
+    if any(basic_info.values()):
+        st.markdown("##### 📋 基本信息")
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            lamp_model = basic_info.get('lamp_model', '未填写')
+            st.markdown(f"""
+            <div style='background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); 
+                        padding: 1rem; border-radius: 10px; text-align: center; color: white;'>
+                <h4>🏷️ 灯具型号</h4>
+                <h3>{lamp_model}</h3>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col2:
+            manufacturer = basic_info.get('manufacturer', '未填写')
+            st.markdown(f"""
+            <div style='background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                        padding: 1rem; border-radius: 10px; text-align: center; color: white;'>
+                <h4>🏢 制造商/单位</h4>
+                <h3>{manufacturer}</h3>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col3:
+            test_date = basic_info.get('test_date', '未填写')
+            st.markdown(f"""
+            <div style='background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); 
+                        padding: 1rem; border-radius: 10px; text-align: center; color: white;'>
+                <h4>📅 测试日期</h4>
+                <h3>{test_date}</h3>
+            </div>
+            """, unsafe_allow_html=True)
+    
+    st.markdown("##### ⚡ 电气参数")
     # 使用卡片式布局
     col1, col2, col3, col4 = st.columns(4)
     
@@ -1816,6 +2982,117 @@ def display_results(results, df):
         
         总光子通量: {results['calculations']['total_photon_flux']:.2f} μmol/s
         """)
+    
+    # 在最后添加报告下载功能
+    st.markdown("---")
+    st.header("📄 分析报告下载")
+    
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        st.markdown("""
+        **📋 完整分析报告内容包括：**
+        - 🏷️ 灯具基本信息（型号、制造商、测试日期）
+        - ⚡ 电气参数（辐射通量、功率、温度、功率因数）
+        - 🏆 综合评价和等级评定
+        - 🎯 核心性能指标（PPE、PAR占比、R/B比、光能比）
+        - 🌈 光谱分布图表和数据分析
+        - 🧬 植物生理响应指标
+        - 🌾 作物适应性评价（叶菜类、果菜类、育苗专用）
+        - 📈 生长阶段适配性分析
+        - 💰 能效与经济性分析
+        - 💡 专业光谱优化建议
+        - 📊 详细计算数据和方法说明
+        """)
+    
+    with col2:
+        # 生成报告内容
+        if PDF_AVAILABLE:
+            try:
+                report_data = generate_pdf_report(results, df)
+                mime_type = "application/pdf"
+                file_ext = ".pdf"
+                format_name = "PDF"
+                
+                # 生成文件名（包含灯具型号和日期）
+                lamp_model = results.get('basic_info', {}).get('lamp_model', 'Unknown')
+                test_date = results.get('basic_info', {}).get('test_date', 'Unknown')
+                
+                if lamp_model and lamp_model != '未填写' and lamp_model.strip():
+                    # 清理文件名中的特殊字符
+                    clean_model = "".join(c for c in lamp_model if c.isalnum() or c in (' ', '-', '_')).strip()
+                    filename = f"LED光谱分析报告_{clean_model}_{test_date}{file_ext}"
+                else:
+                    filename = f"LED光谱分析报告_{test_date}{file_ext}"
+                
+                st.download_button(
+                    label="📥 下载完整分析报告 (PDF)",
+                    data=report_data,
+                    file_name=filename,
+                    mime=mime_type,
+                    help="点击下载包含所有图表和分析数据的PDF报告",
+                    use_container_width=True
+                )
+                
+                st.success("✅ PDF报告生成成功！")
+                st.info("📊 报告包含完整图表和专业分析数据")
+                
+            except Exception as e:
+                st.error(f"❌ PDF报告生成失败：{str(e)}")
+                st.info("💡 请确保分析数据完整后重试")
+                # 显示详细错误信息用于调试
+                if st.checkbox("显示详细错误信息"):
+                    st.exception(e)
+        else:
+            # PDF库不可用时的处理
+            st.error("❌ PDF生成功能不可用")
+            st.markdown("""
+            **💡 要生成PDF报告，请安装以下依赖库：**
+            ```bash
+            pip install matplotlib seaborn reportlab
+            ```
+            
+            **或者使用简化版HTML报告：**
+            """)
+            
+            try:
+                report_data = generate_simplified_report(results, df)
+                mime_type = "text/html"
+                file_ext = ".html"
+                
+                # 生成文件名
+                lamp_model = results.get('basic_info', {}).get('lamp_model', 'Unknown')
+                test_date = results.get('basic_info', {}).get('test_date', 'Unknown')
+                
+                if lamp_model and lamp_model != '未填写' and lamp_model.strip():
+                    clean_model = "".join(c for c in lamp_model if c.isalnum() or c in (' ', '-', '_')).strip()
+                    filename = f"LED光谱分析报告_{clean_model}_{test_date}{file_ext}"
+                else:
+                    filename = f"LED光谱分析报告_{test_date}{file_ext}"
+                
+                st.download_button(
+                    label="📥 下载简化分析报告 (HTML)",
+                    data=report_data,
+                    file_name=filename,
+                    mime=mime_type,
+                    help="下载包含主要分析数据的HTML报告（不含图表）",
+                    use_container_width=True
+                )
+                
+                st.warning("⚠️ 当前为简化版HTML报告")
+                
+            except Exception as e:
+                st.error(f"❌ 报告生成失败：{str(e)}")
+                if st.checkbox("显示详细错误信息"):
+                    st.exception(e)
+    
+    st.markdown("---")
+    st.markdown("""
+    <div style='text-align: center; color: #7f8c8d; margin-top: 20px;'>
+        <p>🌱 LED植物照明光学度量体系分析系统</p>
+        <p>基于四种光学度量体系：辐射度学 | 光度学 | 光子度量学 | 植物光子度量学</p>
+    </div>
+    """, unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
