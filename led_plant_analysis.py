@@ -25,9 +25,27 @@ try:
     except ImportError:
         PIL_AVAILABLE = False
     PDF_AVAILABLE = True
-except ImportError:
+    
+    # 在Streamlit Cloud上显示成功信息
+    print("✅ PDF生成依赖库加载成功")
+    
+except ImportError as e:
     PDF_AVAILABLE = False
     PIL_AVAILABLE = False
+    
+    # 改进的错误提示，特别针对Streamlit Cloud
+    print(f"⚠️ PDF依赖库加载失败: {str(e)}")
+    print("📝 如果您在本地运行，请执行: pip install matplotlib seaborn reportlab Pillow")
+    print("🌐 如果您在Streamlit Cloud部署，请确保 requirements.txt 包含所有必需依赖库")
+    
+    # 创建一个虚拟的streamlit模块用于错误显示
+    import sys
+    if 'streamlit' in sys.modules:
+        try:
+            import streamlit as st_temp
+            st_temp.warning("⚠️ PDF生成功能不可用，将使用简化版HTML报告")
+        except:
+            pass
 
 def generate_simplified_report(results, df_clean):
     """生成简化版本的HTML报告（当PDF库不可用时）"""
@@ -3046,14 +3064,45 @@ def display_results(results, df):
         else:
             # PDF库不可用时的处理
             st.error("❌ PDF生成功能不可用")
-            st.markdown("""
-            **💡 要生成PDF报告，请安装以下依赖库：**
-            ```bash
-            pip install matplotlib seaborn reportlab
-            ```
             
-            **或者使用简化版HTML报告：**
-            """)
+            # 检查运行环境并给出相应建议
+            st.markdown("**💡 解决方案：**")
+            
+            with st.expander("🔧 在Streamlit Cloud上部署", expanded=True):
+                st.markdown("""
+                如果您在Streamlit Cloud上运行此应用，请确保您的GitHub仓库包含正确的 `requirements.txt` 文件：
+                
+                ```
+                streamlit>=1.28.0
+                pandas>=1.5.0
+                numpy>=1.21.0
+                plotly>=5.15.0
+                matplotlib>=3.7.0
+                seaborn>=0.12.0
+                reportlab>=4.0.0
+                Pillow>=10.0.0
+                openpyxl>=3.0.0
+                ```
+                
+                **部署步骤：**
+                1. 在您的GitHub仓库根目录创建/更新 `requirements.txt` 文件
+                2. 将上述内容添加到文件中
+                3. 提交并推送更改到GitHub
+                4. 在Streamlit Cloud中重新部署应用
+                5. 等待依赖库安装完成（通常需要几分钟）
+                """)
+            
+            with st.expander("💻 本地运行"):
+                st.markdown("""
+                如果您在本地运行此应用，请在终端中执行：
+                ```bash
+                pip install matplotlib seaborn reportlab Pillow
+                ```
+                然后重启应用。
+                """)
+            
+            st.markdown("**📄 临时解决方案：**")
+            st.info("当前将为您生成简化版HTML报告，包含主要分析数据但不含图表。")
             
             try:
                 report_data = generate_simplified_report(results, df)
@@ -3079,7 +3128,7 @@ def display_results(results, df):
                     use_container_width=True
                 )
                 
-                st.warning("⚠️ 当前为简化版HTML报告")
+                st.warning("⚠️ 当前为简化版HTML报告（不含图表）")
                 
             except Exception as e:
                 st.error(f"❌ 报告生成失败：{str(e)}")
