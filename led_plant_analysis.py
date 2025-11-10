@@ -6,6 +6,9 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import base64
 import io
+import sys
+import os
+import platform
 from datetime import datetime
 
 # 尝试导入PDF相关库，如果失败则使用简化版本
