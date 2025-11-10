@@ -17,9 +17,7 @@ seaborn>=0.12.0
 reportlab>=4.0.0
 Pillow>=10.0.0
 
-# 字体支持库 - 支持Streamlit Cloud环境中的中文显示
-matplotlib>=3.7.0
-ttf-roboto>=2.138.0  # Streamlit Cloud环境中支持的字体
+# 字体支持已通过packages.txt处理
 
 # Excel文件支持
 openpyxl>=3.0.0
