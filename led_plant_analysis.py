@@ -546,9 +546,27 @@ def generate_chart_images(results, df_clean):
         print("======= Matplotlib字体加载完成 =======")
         
         # 1. 光谱分布图（彩虹图谱）
+        # 重要：为每个图表创建前重置matplotlib字体设置，避免之前的设置影响
+        plt.rcParams['font.family'] = ['sans-serif']
+        plt.rcParams['font.sans-serif'] = font_list
+        plt.rcParams['axes.unicode_minus'] = False
+        
+        # 增强Streamlit Cloud环境的字体支持
+        if 'streamlit' in sys.modules:
+            print("🔧 再次确认Streamlit环境下的字体设置")
+            # 强制使用Noto Sans SC作为首选字体
+            plt.rcParams['font.sans-serif'] = ['Noto Sans SC'] + [f for f in font_list if f != 'Noto Sans SC']
+            # 确保使用Agg后端
+            import matplotlib
+            matplotlib.use('Agg', force=True)
+            # 设置渲染参数
+            plt.rcParams['pdf.fonttype'] = 42
+            plt.rcParams['ps.fonttype'] = 42
+        
         fig, ax = plt.subplots(figsize=(12, 6))
         
         # 确保font_list存在且不为空，增强Streamlit Cloud支持
+        print("🔧 为光谱图进行字体环境检查")
         if 'font_list' not in locals() or not font_list:
             # 检测是否在Streamlit Cloud环境 - 增强版
             is_streamlit_cloud = False
@@ -597,9 +615,10 @@ def generate_chart_images(results, df_clean):
         
         print(f"光谱图使用字体: {font_family}")
         
-        # 强制设置字体参数，确保在无头环境中也能正常工作
+        # 显式设置字体参数，确保在无头环境中也能正常工作
         plt.rcParams['font.family'] = ['sans-serif']
         plt.rcParams['font.sans-serif'] = [font_family] + font_list[1:]
+        print(f"✅ 光谱图最终字体设置: {plt.rcParams['font.sans-serif'][:3]}...")
         
         # 为Streamlit Cloud环境添加额外的字体安全保障
         if 'streamlit' in sys.modules:
@@ -682,15 +701,23 @@ def generate_chart_images(results, df_clean):
         
         # 为图表添加网格和边界设置
         ax.grid(True, linestyle='--', alpha=0.7)
-        ax.set_title('LED光谱分布图 (彩虹色谱)', fontsize=14, fontweight='bold', fontfamily=font_family)
-        ax.set_xlabel('波长 (nm)', fontsize=12, fontweight='bold', fontfamily=font_family)
-        ax.set_ylabel('辐射强度', fontsize=12, fontweight='bold', fontfamily=font_family)
+        # 强制使用已知在Streamlit Cloud环境中可用的字体组合
+        title_font_dict = {'fontsize': 14, 'fontweight': 'bold', 'family': font_family}
+        label_font_dict = {'fontsize': 12, 'fontweight': 'bold', 'family': font_family}
+        
+        ax.set_title('LED光谱分布图 (彩虹色谱)', **title_font_dict)
+        ax.set_xlabel('波长 (nm)', **label_font_dict)
+        ax.set_ylabel('辐射强度', **label_font_dict)
+        print(f"✅ 光谱图标题和标签字体已设置为: {font_family}")
         
         # 显式设置刻度标签的字体
         for label in ax.get_xticklabels():
             label.set_fontfamily(font_family)
+            label.set_fontsize(10)
         for label in ax.get_yticklabels():
             label.set_fontfamily(font_family)
+            label.set_fontsize(10)
+        print("✅ 光谱图刻度标签字体已设置")
         
         # 添加波段标记
         bands = [(400, 500, '蓝光'), (500, 600, '绿光'), (600, 700, '红光'), (700, 800, '远红光')]
@@ -714,22 +741,50 @@ def generate_chart_images(results, df_clean):
         
         # 保存为字节流 - 添加更多参数确保正确渲染
         img_buffer = io.BytesIO()
-        plt.savefig(img_buffer, 
-                   format='png', 
-                   dpi=200,  # 适当降低dpi以减小文件大小
-                   bbox_inches='tight', 
-                   facecolor='white', 
-                   edgecolor='none',
-                   pad_inches=0.1,
-                   metadata={'Title': 'LED光谱分布图', 
-                            'Author': 'LED植物灯光效分析系统',
-                            'Creator': 'matplotlib'})
+        # 为Streamlit Cloud环境添加额外的保存参数
+        save_params = {
+            'format': 'png',
+            'dpi': 200,  # 适当降低dpi以减小文件大小
+            'bbox_inches': 'tight',
+            'facecolor': 'white',
+            'edgecolor': 'none',
+            'pad_inches': 0.1,
+            'metadata': {'Title': 'LED光谱分布图', 
+                        'Author': 'LED植物灯光效分析系统',
+                        'Creator': 'matplotlib'}
+        }
+        
+        # 在Streamlit环境中添加额外的字体渲染保障
+        if 'streamlit' in sys.modules:
+            print("🔧 在Streamlit环境中应用增强的保存设置")
+            # 尝试使用不同的渲染后端选项
+            try:
+                import matplotlib.backends.backend_agg as agg
+                canvas = agg.FigureCanvasAgg(fig)
+                canvas.draw()
+                # 保存时强制使用文本模式而非路径模式
+                save_params['bbox_inches'] = 'tight'
+                save_params['pad_inches'] = 0.2  # 增加边距确保文字完整
+            except Exception as e:
+                print(f"⚠️ Canvas操作异常: {e}")
+        
+        plt.savefig(img_buffer, **save_params)
         img_buffer.seek(0)
         chart_images['spectrum'] = img_buffer
         plt.close()
         print("✅ 彩虹光谱分布图生成完成")
         
         # 2. 光质分布饼图
+        # 重置matplotlib设置，确保每个图表都有独立的字体环境
+        plt.rcParams['font.family'] = ['sans-serif']
+        plt.rcParams['font.sans-serif'] = font_list
+        plt.rcParams['axes.unicode_minus'] = False
+        
+        # 为饼图专门设置字体
+        if 'streamlit' in sys.modules:
+            print("🔧 为饼图应用Streamlit环境字体设置")
+            plt.rcParams['font.sans-serif'] = ['Noto Sans SC'] + [f for f in font_list if f != 'Noto Sans SC']
+        
         fig, ax = plt.subplots(figsize=(10, 8))
         percentages = results.get('percentages', {})
         
@@ -752,6 +807,7 @@ def generate_chart_images(results, df_clean):
         colors_pie = ['#4285F4', '#34A853', '#EA4335', '#FB04DA']
         
         # 确保font_list存在且不为空，增强Streamlit Cloud支持
+        print("🔧 为饼图进行字体环境检查")
         if 'font_list' not in locals() or not font_list:
             # 增强版Streamlit Cloud环境检测
             is_streamlit_cloud = (
@@ -779,26 +835,32 @@ def generate_chart_images(results, df_clean):
         
         # 智能字体选择：逐个验证字体是否可用
         available_font = font_list[0]
-        try:
-            test_font = available_font
-            plt.rcParams['font.sans-serif'] = [test_font]
-            plt.rcParams['font.family'] = ['sans-serif']
-            # 测试字体是否真的生效
-            test_fig, test_ax = plt.subplots(figsize=(1, 1))
-            test_ax.text(0.5, 0.5, '测试字体', fontsize=10)
-            plt.close(test_fig)
-            print(f"✓ 确认字体 {test_font} 可用")
-        except Exception as e:
-            print(f"⚠️ 字体 {available_font} 不可用: {e}")
-            # 尝试下一个字体
-            if len(font_list) > 1:
-                available_font = font_list[1]
-                print(f"尝试使用备用字体: {available_font}")
+        # 增强版字体验证
+        for font_candidate in font_list:
+            try:
+                print(f"🔍 测试字体: {font_candidate}")
+                # 创建一个字体属性对象进行测试
+                test_font_prop = plt.font_manager.FontProperties(family=font_candidate)
+                # 检查字体是否真的被识别
+                if test_font_prop.get_name().lower() != 'sans-serif':
+                    available_font = font_candidate
+                    print(f"✓ 确认字体 {available_font} 可用")
+                    break
+            except Exception as e:
+                print(f"⚠️ 字体 {font_candidate} 测试失败: {e}")
+                continue
+        
+        # 设置字体
+        plt.rcParams['font.sans-serif'] = [available_font] + font_list[1:]
+        plt.rcParams['font.family'] = ['sans-serif']
+        print(f"✅ 饼图最终字体设置: {plt.rcParams['font.sans-serif'][:3]}...")
         
         # 显式设置字体参数
-        plt.rcParams['font.sans-serif'] = font_list
+        plt.rcParams['font.sans-serif'] = [available_font] + font_list[1:]
         plt.rcParams['font.family'] = ['sans-serif']
         plt.rcParams['axes.unicode_minus'] = False
+        plt.rcParams['pdf.fonttype'] = 42
+        plt.rcParams['ps.fonttype'] = 42
         
         # 为Streamlit Cloud环境添加PDF/PS渲染参数
         if is_streamlit_cloud:
@@ -816,8 +878,13 @@ def generate_chart_images(results, df_clean):
         plt.rcParams['font.sans-serif'] = [font_family] + font_list[1:]
         print(f"饼图使用字体: {font_family}")
         
+        # 为饼图标签创建字体字典
+        label_font_dict = {'fontsize': 11, 'fontweight': 'bold', 'family': font_family}
+        title_font_dict = {'fontsize': 16, 'fontweight': 'bold', 'family': font_family}
+        
+        # 使用字体字典
         wedges, texts, autotexts = ax.pie(sizes, labels=labels, colors=colors_pie, autopct='%1.1f%%',
-                                         startangle=90, textprops={'fontsize': 11, 'fontweight': 'bold', 'fontfamily': font_family})
+                                         startangle=90, textprops=label_font_dict)
         
         # 确保饼图标签使用正确字体
         for text in texts:
@@ -829,7 +896,9 @@ def generate_chart_images(results, df_clean):
             autotext.set_fontsize(10)
             autotext.set_fontfamily(font_family)
             
-        ax.set_title('光质分布占比', fontsize=16, fontweight='bold', pad=20, fontfamily=font_family)
+        # 使用字体字典
+        ax.set_title('光质分布占比', pad=20, **title_font_dict)
+        print("✅ 饼图标题字体已设置")
         
         plt.tight_layout()
         
@@ -838,16 +907,35 @@ def generate_chart_images(results, df_clean):
         
         # 保存为字节流
         img_buffer = io.BytesIO()
-        plt.savefig(img_buffer, 
-                   format='png', 
-                   dpi=200,  # 适当降低dpi以减小文件大小
-                   bbox_inches='tight',
-                   facecolor='white', 
-                   edgecolor='none',
-                   pad_inches=0.1,
-                   metadata={'Title': '光质分布占比', 
-                            'Author': 'LED植物灯光效分析系统',
-                            'Creator': 'matplotlib'})
+        
+        # 为Streamlit Cloud环境添加额外的保存参数
+        save_params = {
+            'format': 'png',
+            'dpi': 200,
+            'bbox_inches': 'tight',
+            'facecolor': 'white',
+            'edgecolor': 'none',
+            'pad_inches': 0.1,
+            'metadata': {'Title': '光质分布占比', 
+                        'Author': 'LED植物灯光效分析系统',
+                        'Creator': 'matplotlib'}
+        }
+        
+        # 在Streamlit环境中添加额外的字体渲染保障
+        if 'streamlit' in sys.modules:
+            print("🔧 在Streamlit环境中应用增强的饼图保存设置")
+            # 尝试使用不同的渲染后端选项
+            try:
+                import matplotlib.backends.backend_agg as agg
+                canvas = agg.FigureCanvasAgg(fig)
+                canvas.draw()
+                # 保存时强制使用文本模式而非路径模式
+                save_params['bbox_inches'] = 'tight'
+                save_params['pad_inches'] = 0.2  # 增加边距确保文字完整
+            except Exception as e:
+                print(f"⚠️ 饼图Canvas操作异常: {e}")
+        
+        plt.savefig(img_buffer, **save_params)
         img_buffer.seek(0)
         chart_images['pie'] = img_buffer
         plt.close()
@@ -1042,6 +1130,25 @@ def generate_pdf_report(results, df_clean):
         from reportlab.pdfbase.cidfonts import UnicodeCIDFont
         import reportlab.lib.fonts
         import os
+        import sys
+        
+        # 检测是否在Streamlit Cloud环境 - 增强版
+        is_streamlit_cloud = False
+        if 'streamlit' in sys.modules:
+            is_streamlit_cloud = True
+            print("🌐 检测到Streamlit模块")
+        if os.environ.get('STREAMLIT_RUNTIME') == 'true':
+            is_streamlit_cloud = True
+            print("🌐 检测到STREAMLIT_RUNTIME环境变量")
+        if os.environ.get('PWD', '').endswith('app'):
+            is_streamlit_cloud = True
+            print("🌐 检测到PWD路径特征")
+        if os.environ.get('HOME') == '/home/appuser':
+            is_streamlit_cloud = True
+            print("🌐 检测到Streamlit Cloud默认用户")
+        if os.environ.get('DOCKER_CONTAINER') == 'true':
+            is_streamlit_cloud = True
+            print("🌐 检测到Docker容器环境")
         
         # 获取系统信息
         system = platform.system()
@@ -1117,13 +1224,30 @@ def generate_pdf_report(results, df_clean):
                 
             else:  # Linux系统
                 # Linux系统尝试常见中文字体路径
-                font_paths = [
-                    ('/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf', 'DroidSansFallback'),
-                    ('/usr/share/fonts/truetype/wqy/wqy-microhei.ttc', 'WenQuanYiMicroHei'),
-                    ('/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc', 'WenQuanYiZenHei'),
-                    ('/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc', 'NotoSansCJK')
-                ]
-                print(f"🔍 Linux系统: 尝试加载以下字体")
+                # 为Streamlit Cloud环境添加更多Noto字体搜索路径
+                font_paths = []
+                
+                # Streamlit Cloud环境特殊处理
+                if is_streamlit_cloud:
+                    print(f"🔍 Streamlit Cloud环境: 优先尝试Noto字体")
+                    font_paths = [
+                        # Streamlit Cloud中可能存在的Noto字体路径
+                        ('/usr/share/fonts/truetype/noto/NotoSansSC-Regular.ttf', 'NotoSansSC'),
+                        ('/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf', 'NotoSans'),
+                        ('/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc', 'NotoSansCJK'),
+                        ('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf', 'DejaVuSans'),
+                        # 添加更多可能的Noto字体路径
+                        ('/usr/share/fonts/truetype/google-noto/NotoSansSC-Regular.ttf', 'NotoSansSC'),
+                        ('/usr/share/fonts/truetype/noto-cjk/NotoSansCJK-Regular.ttc', 'NotoSansCJK')
+                    ]
+                else:
+                    print(f"🔍 标准Linux系统: 尝试加载以下字体")
+                    font_paths = [
+                        ('/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf', 'DroidSansFallback'),
+                        ('/usr/share/fonts/truetype/wqy/wqy-microhei.ttc', 'WenQuanYiMicroHei'),
+                        ('/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc', 'WenQuanYiZenHei'),
+                        ('/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc', 'NotoSansCJK')
+                    ]
             
             # 尝试加载系统字体
             for font_path, font_alias in font_paths:
@@ -1174,6 +1298,22 @@ def generate_pdf_report(results, df_clean):
                     print(f"✅ 成功注册CID中文字体: STSong-Light")
                 except Exception as e:
                     print(f"⚠️ 注册CID字体失败: {str(e)}")
+                    
+                    # Streamlit Cloud环境下的额外尝试
+                    if is_streamlit_cloud:
+                        print("🔄 Streamlit Cloud环境: 尝试使用内置字体作为最后手段...")
+                        try:
+                            # 尝试直接使用通用字体族，不依赖特定字体文件
+                            chinese_font = 'DejaVu Sans'
+                            pdfmetrics.registerFontFamily('DejaVuSans', 
+                                                        normal='DejaVu Sans', 
+                                                        bold='DejaVu Sans Bold', 
+                                                        italic='DejaVu Sans Oblique', 
+                                                        boldItalic='DejaVu Sans Bold Oblique')
+                            font_loaded = True
+                            print(f"✅ 成功设置DejaVu Sans作为备用字体")
+                        except Exception as e2:
+                            print(f"⚠️ DejaVu Sans设置失败: {str(e2)}")
                         
     except Exception as e:
         print(f"❌ 字体注册异常: {str(e)}")
@@ -1192,6 +1332,16 @@ def generate_pdf_report(results, df_clean):
         except Exception as e2:
             print(f"❌ 无法恢复: {str(e2)}")
             chinese_font = 'Helvetica'  # 最后回退到默认字体
+    
+    print(f"📋 最终使用字体: {chinese_font}")
+    
+    # 为Streamlit Cloud环境添加额外的字体安全保障
+    if is_streamlit_cloud:
+        print("✅ 在Streamlit Cloud环境中应用增强的PDF渲染设置")
+        # 即使没有找到理想的字体，也要确保基本功能
+        if not font_loaded:
+            print("⚠️ 未找到理想字体，但将继续尝试使用基本字体")
+            chinese_font = 'Helvetica'
     
     print(f"📋 最终使用字体: {chinese_font}")
     
