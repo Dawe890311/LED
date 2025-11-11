@@ -6,9 +6,6 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import base64
 import io
-import sys
-import os
-import platform
 from datetime import datetime
 
 # 尝试导入PDF相关库，如果失败则使用简化版本
@@ -171,105 +168,67 @@ def generate_chart_images(results, df_clean):
     print(f"- 百分比数据数量: {len(percentages)}")
     
     try:
-        # 首先强制设置matplotlib后端为Agg，确保在任何环境下都能正常工作
-        import matplotlib
-        print(f"🔧 当前后端: {matplotlib.get_backend()}")
-        matplotlib.use('Agg', force=True)  # 强制切换后端
-        print(f"✅ 切换后端为: Agg")
-        
-        # 然后导入其他库
+        # 首先确保导入必需的库
         from matplotlib import pyplot as plt
         import matplotlib.font_manager as fm
         import platform
         import os
         
-        # 字体加载调试信息
-        print("======= Matplotlib字体加载开始 =======")
-        
         # 设置matplotlib中文字体 - 增强版本，优先使用本地字体
         # 首先尝试加载项目中的中文字体
-        base_dir = os.path.dirname(os.path.abspath(__file__))
-        fonts_dir = os.path.join(base_dir, 'fonts')
-        local_fonts = [
-            os.path.join(fonts_dir, 'NotoSansSC-Regular.ttf'),
-            os.path.join(fonts_dir, 'NotoSansSC-Regular.otf'),
-            os.path.join(fonts_dir, 'NotoSansSC-Regular.ttc'),
-            # 添加更多可能的中文字体文件名
-            os.path.join(fonts_dir, 'simhei.ttf'),
-            os.path.join(fonts_dir, 'simsun.ttc'),
-            os.path.join(fonts_dir, 'msyh.ttc'),
-        ]
-        
+        local_font_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'fonts', 'NotoSansSC-Regular.ttf')
         font_set = False
-        chinese_fonts = []
-        current_font = None
         
-        # 尝试加载本地可用的中文字体
-        for font_path in local_fonts:
-            if os.path.exists(font_path):
-                try:
-                    # 尝试添加字体到matplotlib
-                    fm.fontManager.addfont(font_path)
-                    font_name = os.path.splitext(os.path.basename(font_path))[0]
-                    chinese_fonts.append(font_name)
-                    font_set = True
-                    print(f"✅ 成功加载本地中文字体: {font_path}")
-                    # 不再break，尝试加载所有可用字体
-                except Exception as e:
-                    print(f"⚠️ 加载本地字体 {font_path} 失败: {str(e)}")
+        # 尝试注册并使用本地字体
+        if os.path.exists(local_font_path):
+            try:
+                font_prop = fm.FontProperties(fname=local_font_path)
+                # 设置全局字体
+                plt.rcParams['font.sans-serif'] = ['Noto Sans SC', 'SimHei', 'Arial Unicode MS', 'DejaVu Sans']
+                plt.rcParams['axes.unicode_minus'] = False  # 解决负号显示问题
+                font_set = True
+                print(f"✅ 成功加载本地中文字体: {local_font_path}")
+            except Exception as e:
+                print(f"⚠️ 加载本地字体失败: {str(e)}")
         
         # 获取系统信息
         system = platform.system()
-        print(f"检测到系统: {system}")
         
         # 如果本地字体加载失败，尝试系统字体
         if not font_set:
-            print("本地字体加载失败，尝试加载系统字体")
-            
-            # 初始化字体列表
-            potential_fonts = []
-            font_names = []
-            
-            # 根据系统选择可能的字体路径
-            if system == "Windows":
-                # Windows常见中文字体路径
-                potential_fonts = [
-                    'C:/Windows/Fonts/simhei.ttf',     # 黑体
-                    'C:/Windows/Fonts/simsun.ttc',     # 宋体
-                    'C:/Windows/Fonts/msyh.ttc',       # 微软雅黑
-                    'C:/Windows/Fonts/simkai.ttf',     # 楷体
-                    'C:/Windows/Fonts/simfang.ttf'     # 仿宋
-                ]
-                font_names = ['SimHei', 'SimSun', 'Microsoft YaHei', 'KaiTi', 'FangSong']
-            elif system == "Darwin":  # macOS
-                potential_fonts = [
-                    '/System/Library/Fonts/PingFang.ttc',
-                    '/System/Library/Fonts/STSong.ttc',
-                    '/System/Library/Fonts/STHeiti Light.ttc',
-                    '/System/Library/Fonts/STKaiti.ttc',
-                    '/System/Library/Fonts/STFangsong.ttc',
-                    '/Library/Fonts/PingFang.ttc',  # 备选路径
-                    '/Library/Fonts/NotoSansSC-Regular.ttf'  # 用户安装的字体
-                ]
-                font_names = ['PingFang SC', 'STSong', 'STHeiti', 'STKaiti', 'STFangsong', 'PingFang SC', 'Noto Sans SC']
-            else:  # Linux/其他系统，特别是Streamlit Cloud环境
-                # 扩展Linux字体路径，覆盖更多可能的位置
-                potential_fonts = [
-                    # Streamlit Cloud环境中可能存在的字体路径
-                    '/usr/share/fonts/truetype/noto/NotoSansSC-Regular.ttf',
-                    '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc',
-                    # 其他常见Linux字体路径
-                    '/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf',
-                    '/usr/share/fonts/truetype/wqy/wqy-microhei.ttc',
-                    '/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc',
-                    '/var/lib/defoma/fontconfig.d/fonts/truetype/wqy/wqy-microhei.ttc',
-                    # Docker环境中可能的字体路径
-                    '/usr/local/share/fonts/noto/NotoSansSC-Regular.ttf',
-                    # 尝试查找所有已安装的Noto Sans SC字体
-                    '/usr/share/fonts/truetype/noto/NotoSansSC*.ttf'
-                ]
-                font_names = ['Noto Sans SC', 'Noto Sans CJK', 'Droid Sans Fallback', 'WenQuanYi Micro Hei', 'WenQuanYi Zen Hei', 'WenQuanYi Micro Hei', 'Noto Sans SC', 'Noto Sans SC']
-            
+            # 寻找系统中可用的中文字体
+            chinese_fonts = []
+        
+        if not font_set and system == "Windows":
+            # Windows常见中文字体路径
+            potential_fonts = [
+                'C:/Windows/Fonts/simhei.ttf',     # 黑体
+                'C:/Windows/Fonts/simsun.ttc',     # 宋体
+                'C:/Windows/Fonts/msyh.ttc',       # 微软雅黑
+                'C:/Windows/Fonts/simkai.ttf',     # 楷体
+                'C:/Windows/Fonts/simfang.ttf'     # 仿宋
+            ]
+            font_names = ['SimHei', 'SimSun', 'Microsoft YaHei', 'KaiTi', 'FangSong']
+        elif not font_set and system == "Darwin":  # macOS
+            potential_fonts = [
+                '/System/Library/Fonts/PingFang.ttc',
+                '/System/Library/Fonts/STSong.ttc',
+                '/System/Library/Fonts/STHeiti Light.ttc',
+                '/System/Library/Fonts/STKaiti.ttc',
+                '/System/Library/Fonts/STFangsong.ttc'
+            ]
+            font_names = ['PingFang SC', 'STSong', 'STHeiti', 'STKaiti', 'STFangsong']
+        elif not font_set:  # Linux
+            potential_fonts = [
+                '/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf',
+                '/usr/share/fonts/truetype/wqy/wqy-microhei.ttc',
+                '/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc',
+                '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc'
+            ]
+            font_names = ['Droid Sans Fallback', 'WenQuanYi Micro Hei', 'WenQuanYi Zen Hei', 'Noto Sans CJK']
+        
+        # 只有在需要尝试系统字体时才执行这部分代码
+        if not font_set:
             # 检查字体文件是否存在并添加到matplotlib
             for font_path, font_name in zip(potential_fonts, font_names):
                 if os.path.exists(font_path):
@@ -277,356 +236,34 @@ def generate_chart_images(results, df_clean):
                         # 添加字体到matplotlib
                         fm.fontManager.addfont(font_path)
                         chinese_fonts.append(font_name)
-                        font_set = True
-                        print(f"✅ 成功加载系统字体: {font_path} ({font_name})")
-                        # 不再break，尝试加载所有可用字体
                     except Exception as e:
-                        print(f"⚠️ 无法添加字体 {font_name}: {e}")
-            
-            # 尝试直接通过字体名称加载（不依赖文件路径）- 增强版本
-            if not font_set:
-                print("尝试直接通过字体名称加载系统中文字体...")
-                # 扩展通用中文字体名称列表，覆盖更多可能支持中文的字体
-                common_chinese_fonts = [
-                    # 首选字体，通常在大多数系统上可用
-                    'Noto Sans SC', 'Noto Sans CJK',
-                    # Windows字体
-                    'SimHei', 'Microsoft YaHei', 'SimSun',
-                    # macOS字体
-                    'PingFang SC', 'STHeiti', 'STSong',
-                    # Linux字体
-                    'WenQuanYi Micro Hei', 'WenQuanYi Zen Hei', 'Droid Sans Fallback',
-                    # 其他可能支持中文的通用字体
-                    'Arial Unicode MS', 'DejaVu Sans', 'Arial',
-                    # 作为最后手段的兜底字体
-                    'sans-serif'
-                ]
-                
-                # 尝试所有字体名称，直到找到可用的
-                for font_name in common_chinese_fonts:
-                    try:
-                        # 尝试创建字体属性，验证字体是否可用
-                        font_prop = fm.FontProperties(family=font_name)
-                        # 更准确的字体验证
-                        try:
-                            # 尝试获取字体文件路径
-                            font_files = [f for f in fm.findSystemFonts(fontpaths=None) if font_name.lower() in f.lower()]
-                            if font_files:
-                                chinese_fonts.append(font_name)
-                                font_set = True
-                                print(f"✅ 成功通过字体名称加载: {font_name} (找到字体文件: {font_files[0]})")
-                                # 尝试加载找到的字体文件
-                                try:
-                                    for font_file in font_files[:3]:  # 加载前3个找到的字体文件
-                                        fm.fontManager.addfont(font_file)
-                                        print(f"  - 已添加字体文件: {font_file}")
-                                except Exception as inner_e:
-                                    print(f"  - 添加字体文件时出错: {inner_e}")
-                                break
-                        except:
-                            # 如果获取字体文件路径失败，使用基本验证
-                            if font_prop.get_family()[0] != 'sans-serif':
-                                chinese_fonts.append(font_name)
-                                font_set = True
-                                print(f"✅ 成功通过字体名称加载: {font_name}")
-                                break
-                    except Exception as e:
-                        print(f"⚠️ 字体名称 {font_name} 不可用: {e}")
+                        print(f"无法添加字体 {font_name}: {e}")
+                        continue
         
-        # 设置matplotlib字体 - 增强版本
+        # 设置matplotlib字体
         try:
-            # 构建字体列表 - 更全面的字体回退机制
-            font_list = []
-            
-            # 添加已加载的中文字体（如果有）
             if chinese_fonts:
-                font_list.extend(chinese_fonts)
-                print(f"已加载的中文字体: {chinese_fonts}")
+                plt.rcParams['font.sans-serif'] = chinese_fonts + ['DejaVu Sans', 'Arial']
+                print(f"成功加载中文字体: {chinese_fonts}")
             else:
-                # 默认字体列表，包含更多可能支持中文的字体，排序以确保最佳兼容性
-                font_list = [
-                    'Noto Sans SC', 'Noto Sans CJK',  # 首选开源字体
-                    'SimHei', 'Microsoft YaHei', 'SimSun',  # Windows字体
-                    'PingFang SC', 'STHeiti', 'STSong',  # macOS字体
-                    'WenQuanYi Micro Hei', 'WenQuanYi Zen Hei', 'Droid Sans Fallback',  # Linux字体
-                    'Arial Unicode MS',  # 通用Unicode字体
-                    'DejaVu Sans', 'Arial', 'Helvetica', 'sans-serif'  # 兜底字体
-                ]
-                print("使用默认中文字体列表")
+                # 如果没有找到中文字体，尝试使用系统内置的
+                plt.rcParams['font.sans-serif'] = ['SimHei', 'PingFang SC', 'DejaVu Sans', 'Arial']
+                print("使用系统默认字体设置")
             
-            # 去重但保持顺序
-            unique_font_list = []
-            seen = set()
-            for font in font_list:
-                if font not in seen:
-                    seen.add(font)
-                    unique_font_list.append(font)
-            font_list = unique_font_list
-            
-            # 针对不同平台优化字体列表
-            if platform.system() == 'Darwin':  # macOS
-                # 强制将STHeiti和Arial Unicode MS放在最前面
-                font_list = ['STHeiti', 'Arial Unicode MS', 'PingFang SC'] + [f for f in font_list if f not in ['STHeiti', 'Arial Unicode MS', 'PingFang SC']]
-                print(f"✅ 为macOS优化字体列表，优先使用STHeiti和Arial Unicode MS")
-            elif platform.system() == 'Windows':
-                font_list = ['SimHei', 'Microsoft YaHei'] + [f for f in font_list if f not in ['SimHei', 'Microsoft YaHei']]
-                print(f"✅ 为Windows优化字体列表，优先使用SimHei和Microsoft YaHei")
-            else:  # Linux / Streamlit Cloud
-                # 增强Streamlit Cloud环境的字体支持
-                # 检测是否在Streamlit Cloud环境 - 增强版
-                is_streamlit_cloud = False
-                
-                # 多维度检测Streamlit Cloud环境
-                if 'streamlit' in sys.modules:
-                    is_streamlit_cloud = True
-                    print("🌐 检测到Streamlit模块")
-                if os.environ.get('STREAMLIT_RUNTIME') == 'true':
-                    is_streamlit_cloud = True
-                    print("🌐 检测到STREAMLIT_RUNTIME环境变量")
-                if os.environ.get('PWD', '').endswith('app'):
-                    is_streamlit_cloud = True
-                    print("🌐 检测到PWD路径特征")
-                if os.environ.get('DOCKER_CONTAINER') == 'true':
-                    is_streamlit_cloud = True
-                    print("🌐 检测到Docker容器环境")
-                if os.environ.get('HOME') == '/home/appuser':
-                    is_streamlit_cloud = True
-                    print("🌐 检测到Streamlit Cloud默认用户")
-                
-                if is_streamlit_cloud:
-                    # Streamlit Cloud优先使用的字体列表 - 增强版
-                    streamlit_cloud_priority = ['Noto Sans SC', 'WenQuanYi Micro Hei', 'WenQuanYi Zen Hei', 'Droid Sans Fallback', 'Roboto', 'DejaVu Sans', 'Arial Unicode MS']
-                    font_list = streamlit_cloud_priority + [f for f in font_list if f not in streamlit_cloud_priority]
-                    print(f"✅ 为Streamlit Cloud环境优化字体列表: {streamlit_cloud_priority[:3]}...")
-                    
-                    # 确保使用Agg后端（无头环境必需）
-                    import matplotlib
-                    matplotlib.use('Agg', force=True)
-                    
-                    # 为Streamlit Cloud设置额外的字体渲染参数
-                    plt.rcParams['pdf.fonttype'] = 42  # 确保文本不被渲染为路径
-                    plt.rcParams['ps.fonttype'] = 42
-                    print("✅ Streamlit环境强制使用Agg后端")
-                else:
-                    # 一般Linux环境
-                    font_list = ['WenQuanYi Micro Hei', 'DejaVu Sans', 'SimHei', 'Arial Unicode MS'] + \
-                               [f for f in font_list if f not in ['WenQuanYi Micro Hei', 'DejaVu Sans', 'SimHei', 'Arial Unicode MS']]
-                    print(f"✅ 为Linux环境优化字体列表")
-            
-            # 不再移除Noto Sans SC，保留更多可能的中文字体选项
-            # 但避免重复字体
-            font_list = list(dict.fromkeys(font_list))
-            
-            # 验证font_list是否为空
-            if not font_list:
-                font_list = ['STHeiti', 'Arial Unicode MS', 'SimHei', 'sans-serif']
-                print("⚠️ 初始font_list为空，已重置为默认值")
-            
-            # 显式设置字体列表和其他关键参数
-            plt.rcParams['font.family'] = ['sans-serif']
-            plt.rcParams['font.sans-serif'] = font_list
             plt.rcParams['axes.unicode_minus'] = False  # 解决负号显示问题
             
-            # 重要：设置PDF字体类型为42，避免文本被渲染为路径
-            plt.rcParams['pdf.fonttype'] = 42
-            plt.rcParams['ps.fonttype'] = 42
-            
-            # 设置图像渲染质量
-            plt.rcParams['figure.dpi'] = 300
-            plt.rcParams['savefig.dpi'] = 300
-            
-            # 尝试重建字体缓存
-            try:
-                if hasattr(fm, '_rebuild'):
-                    fm._rebuild()
-                elif hasattr(fm.fontManager, '_rebuild'):
-                    fm.fontManager._rebuild()
-                print("✅ 字体缓存已重建")
-            except Exception as e:
-                print(f"⚠️ 重建字体缓存失败: {e}")
-            
-            # 更详细的字体信息
-            print(f"当前设置的字体列表: {font_list}")
-            
-            # 创建一个临时图形进行更严格的字体验证
-            fig = plt.figure(figsize=(2, 2))
-            ax = fig.add_subplot(111)
-            # 测试更多中文字符，包括生僻字
-            test_text = ax.text(0.5, 0.5, '测试中文字体 植物生长 光质分析', ha='center', va='center', fontsize=12)
-            
-            # 获取实际使用的字体信息
-            renderer = fig.canvas.get_renderer()
-            text_font = test_text.get_fontproperties()
-            actual_font = text_font.get_name()
-            actual_size = text_font.get_size_in_points()
-            
-            # 检查是否有中文字符丢失（通过测量文本宽度）
-            bbox = test_text.get_window_extent(renderer=renderer)
-            text_width = bbox.width
-            
-            print(f"实际使用的字体: {actual_font}")
-            print(f"字体大小: {actual_size}pt")
-            print(f"测试文本宽度: {text_width}px")
-            
-            # 字体有效性判断
-            if actual_font.lower() in ['sans-serif', 'dejavu sans', 'arial', 'roboto']:
-                print(f"⚠️ 可能使用了回退字体({actual_font})，中文字符可能显示不正常")
-                
-                # 检测是否在Streamlit Cloud环境 - 增强版
-                is_streamlit_cloud = False
-                if 'streamlit' in sys.modules:
-                    is_streamlit_cloud = True
-                if os.environ.get('STREAMLIT_RUNTIME') == 'true':
-                    is_streamlit_cloud = True
-                if os.environ.get('PWD', '').endswith('app'):
-                    is_streamlit_cloud = True
-                if os.environ.get('HOME') == '/home/appuser':
-                    is_streamlit_cloud = True
-                
-                if is_streamlit_cloud:
-                    # Streamlit Cloud特殊字体回退策略 - 增强版
-                    aggressive_fonts = ['Noto Sans SC', 'WenQuanYi Micro Hei', 'WenQuanYi Zen Hei', 'Droid Sans Fallback', 'Roboto', 'DejaVu Sans', 'Arial Unicode MS', 'sans-serif']
-                    print(f"🔧 Streamlit Cloud环境应用特殊字体回退策略: {aggressive_fonts[:3]}...")
-                    
-                    # 为Streamlit Cloud设置额外的PDF渲染参数
-                    plt.rcParams['pdf.fonttype'] = 42  # 确保文本不被渲染为路径
-                    plt.rcParams['ps.fonttype'] = 42
-                    plt.rcParams['text.antialiased'] = True  # 启用文本抗锯齿
-                else:
-                    # 通用激进字体策略
-                    aggressive_fonts = ['SimHei', 'WenQuanYi Micro Hei', 'Arial Unicode MS', 'DejaVu Sans', 'sans-serif']
-                    print(f"🔧 应用通用字体回退策略: {aggressive_fonts[:3]}...")
-                
-                # 显式设置字体参数
-                plt.rcParams['font.family'] = ['sans-serif']
-                plt.rcParams['font.sans-serif'] = aggressive_fonts
-                plt.rcParams['axes.unicode_minus'] = False  # 确保负号正常显示
-                
-                # 对于Streamlit环境，添加额外保障
-                if is_streamlit_cloud:
-                    print("✅ 在Streamlit Cloud环境中应用增强的文本渲染设置")
-                    # 尝试直接使用字体名称而不是列表索引
-                    try:
-                        # 逐个尝试字体，直到找到可用的
-                        for font in aggressive_fonts:
-                            try:
-                                # 创建临时文本对象测试字体
-                                test_font = plt.font_manager.FontProperties(family=font)
-                                if test_font.get_name().lower() != 'sans-serif':
-                                    plt.rcParams['font.sans-serif'] = [font] + aggressive_fonts[1:]
-                                    print(f"✅ 成功验证并应用字体: {font}")
-                                    break
-                            except:
-                                continue
-                    except:
-                        print("⚠️ 字体验证失败，继续使用字体列表")
-            else:
-                print("✅ 字体验证成功，应能正确显示中文")
-            
-            plt.close(fig)
+            # 测试中文字体是否可用
+            current_font = plt.rcParams['font.sans-serif'][0]
+            print(f"当前使用的字体: {current_font}")
             
         except Exception as e:
             print(f"字体设置失败，使用默认设置: {e}")
-            # 应急字体设置，更加激进的回退机制
-            plt.rcParams['font.family'] = ['sans-serif']
-            plt.rcParams['font.sans-serif'] = ['SimHei', 'WenQuanYi Micro Hei', 'DejaVu Sans', 'Arial', 'sans-serif']
+            # 使用最基本的设置
+            plt.rcParams['font.sans-serif'] = ['DejaVu Sans', 'Arial']
             plt.rcParams['axes.unicode_minus'] = False
-            
-            # 强制设置matplotlib使用Agg后端，这在无头环境（如Streamlit Cloud）中更可靠
-            try:
-                import matplotlib
-                matplotlib.use('Agg', force=True)
-                print("✅ 强制使用Agg后端，适用于无头环境")
-                import matplotlib
-                matplotlib.use('Agg')
-                print("已切换到Agg后端以提高兼容性")
-            except:
-                pass
-        
-        print("======= Matplotlib字体加载完成 =======")
         
         # 1. 光谱分布图（彩虹图谱）
-        # 重要：为每个图表创建前重置matplotlib字体设置，避免之前的设置影响
-        plt.rcParams['font.family'] = ['sans-serif']
-        plt.rcParams['font.sans-serif'] = font_list
-        plt.rcParams['axes.unicode_minus'] = False
-        
-        # 增强Streamlit Cloud环境的字体支持
-        if 'streamlit' in sys.modules:
-            print("🔧 再次确认Streamlit环境下的字体设置")
-            # 强制使用Noto Sans SC作为首选字体
-            plt.rcParams['font.sans-serif'] = ['Noto Sans SC'] + [f for f in font_list if f != 'Noto Sans SC']
-            # 确保使用Agg后端
-            import matplotlib
-            matplotlib.use('Agg', force=True)
-            # 设置渲染参数
-            plt.rcParams['pdf.fonttype'] = 42
-            plt.rcParams['ps.fonttype'] = 42
-        
         fig, ax = plt.subplots(figsize=(12, 6))
-        
-        # 确保font_list存在且不为空，增强Streamlit Cloud支持
-        print("🔧 为光谱图进行字体环境检查")
-        if 'font_list' not in locals() or not font_list:
-            # 检测是否在Streamlit Cloud环境 - 增强版
-            is_streamlit_cloud = False
-            if 'streamlit' in sys.modules:
-                is_streamlit_cloud = True
-            if os.environ.get('STREAMLIT_RUNTIME') == 'true':
-                is_streamlit_cloud = True
-            if os.environ.get('PWD', '').endswith('app'):
-                is_streamlit_cloud = True
-            if os.environ.get('HOME') == '/home/appuser':
-                is_streamlit_cloud = True
-            
-            if is_streamlit_cloud:
-                # Streamlit Cloud优先字体列表 - 增强版
-                font_list = ['Noto Sans SC', 'WenQuanYi Micro Hei', 'WenQuanYi Zen Hei', 'Droid Sans Fallback', 'Roboto', 'DejaVu Sans', 'Arial Unicode MS', 'sans-serif']
-                print("⚠️ 在Streamlit Cloud环境中重新初始化font_list，优先使用Noto Sans SC")
-            else:
-                # 标准环境字体列表
-                if platform.system() == 'Darwin':
-                    font_list = ['STHeiti', 'Arial Unicode MS', 'PingFang SC', 'sans-serif']
-                elif platform.system() == 'Windows':
-                    font_list = ['SimHei', 'Microsoft YaHei', 'Arial Unicode MS', 'sans-serif']
-                else:
-                    font_list = ['WenQuanYi Micro Hei', 'DejaVu Sans', 'Arial Unicode MS', 'sans-serif']
-                print(f"⚠️ 重新初始化font_list: {font_list[:2]}...")
-        
-        # 显式设置字体并验证，增强多平台兼容性
-        plt.rcParams['font.sans-serif'] = font_list
-        plt.rcParams['font.family'] = ['sans-serif']
-        plt.rcParams['axes.unicode_minus'] = False
-        
-        # 智能选择字体 - 逐个验证
-        font_family = None
-        for font in font_list:
-            try:
-                test_font = plt.font_manager.FontProperties(family=font)
-                if test_font.get_name().lower() != 'sans-serif':
-                    font_family = font
-                    break
-            except:
-                continue
-        
-        # 如果找不到合适的字体，使用第一个
-        if font_family is None:
-            font_family = font_list[0]
-        
-        print(f"光谱图使用字体: {font_family}")
-        
-        # 显式设置字体参数，确保在无头环境中也能正常工作
-        plt.rcParams['font.family'] = ['sans-serif']
-        plt.rcParams['font.sans-serif'] = [font_family] + font_list[1:]
-        print(f"✅ 光谱图最终字体设置: {plt.rcParams['font.sans-serif'][:3]}...")
-        
-        # 为Streamlit Cloud环境添加额外的字体安全保障
-        if 'streamlit' in sys.modules:
-            print("✅ 为Streamlit环境应用增强的字体设置")
-            # 添加PDF渲染参数
-            plt.rcParams['pdf.fonttype'] = 42
-            plt.rcParams['ps.fonttype'] = 42
-        
         wavelengths = df_clean['wavelength'].values
         radiations = df_clean['radiation'].values
         
@@ -696,31 +333,14 @@ def generate_chart_images(results, df_clean):
         # 添加整体光谱线条作为轮廓
         ax.plot(wavelengths, radiations, color='black', linewidth=1.5, alpha=0.7)
         
-        # 设置坐标轴和标题 - 显式设置字体
-        font_family = plt.rcParams['font.sans-serif'][0] if plt.rcParams['font.sans-serif'] else 'sans-serif'
-        
-        # 为图表添加网格和边界设置
-        ax.grid(True, linestyle='--', alpha=0.7)
-        # 强制使用已知在Streamlit Cloud环境中可用的字体组合
-        title_font_dict = {'fontsize': 14, 'fontweight': 'bold', 'family': font_family}
-        label_font_dict = {'fontsize': 12, 'fontweight': 'bold', 'family': font_family}
-        
-        ax.set_title('LED Spectral Distribution (Rainbow)', **title_font_dict)
-        ax.set_xlabel('Wavelength (nm)', **label_font_dict)
-        ax.set_ylabel('Radiation Intensity', **label_font_dict)
-        print(f"✅ 光谱图标题和标签字体已设置为: {font_family}")
-        
-        # 显式设置刻度标签的字体
-        for label in ax.get_xticklabels():
-            label.set_fontfamily(font_family)
-            label.set_fontsize(10)
-        for label in ax.get_yticklabels():
-            label.set_fontfamily(font_family)
-            label.set_fontsize(10)
-        print("✅ 光谱图刻度标签字体已设置")
+        # 设置坐标轴和标题
+        ax.set_xlabel('波长 (nm)', fontsize=12, fontweight='bold')
+        ax.set_ylabel('辐射强度', fontsize=12, fontweight='bold')
+        ax.set_title('LED光谱分布图 (彩虹色谱)', fontsize=14, fontweight='bold')
+        ax.grid(True, alpha=0.3)
         
         # 添加波段标记
-        bands = [(400, 500, 'Blue'), (500, 600, 'Green'), (600, 700, 'Red'), (700, 800, 'Far Red')]
+        bands = [(400, 500, '蓝光'), (500, 600, '绿光'), (600, 700, '红光'), (700, 800, '远红光')]
         band_colors = ['blue', 'green', 'red', 'maroon']
         
         for i, (start, end, label) in enumerate(bands):
@@ -736,55 +356,16 @@ def generate_chart_images(results, df_clean):
         
         plt.tight_layout()
         
-        # 保存前再次确认字体设置
-        print(f"保存光谱图前的字体设置: {plt.rcParams['font.sans-serif']}")
-        
-        # 保存为字节流 - 添加更多参数确保正确渲染
+        # 保存为字节流
         img_buffer = io.BytesIO()
-        # 为Streamlit Cloud环境添加额外的保存参数
-        save_params = {
-            'format': 'png',
-            'dpi': 200,  # 适当降低dpi以减小文件大小
-            'bbox_inches': 'tight',
-            'facecolor': 'white',
-            'edgecolor': 'none',
-            'pad_inches': 0.1,
-            'metadata': {'Title': 'LED Spectral Distribution', 
-                        'Author': 'LED Plant Light Analysis System',
-                        'Creator': 'matplotlib'}
-        }
-        
-        # 在Streamlit环境中添加额外的字体渲染保障
-        if 'streamlit' in sys.modules:
-            print("🔧 在Streamlit环境中应用增强的保存设置")
-            # 尝试使用不同的渲染后端选项
-            try:
-                import matplotlib.backends.backend_agg as agg
-                canvas = agg.FigureCanvasAgg(fig)
-                canvas.draw()
-                # 保存时强制使用文本模式而非路径模式
-                save_params['bbox_inches'] = 'tight'
-                save_params['pad_inches'] = 0.2  # 增加边距确保文字完整
-            except Exception as e:
-                print(f"⚠️ Canvas操作异常: {e}")
-        
-        plt.savefig(img_buffer, **save_params)
+        plt.savefig(img_buffer, format='png', dpi=300, bbox_inches='tight', 
+                   facecolor='white', edgecolor='none')
         img_buffer.seek(0)
         chart_images['spectrum'] = img_buffer
         plt.close()
         print("✅ 彩虹光谱分布图生成完成")
         
         # 2. 光质分布饼图
-        # 重置matplotlib设置，确保每个图表都有独立的字体环境
-        plt.rcParams['font.family'] = ['sans-serif']
-        plt.rcParams['font.sans-serif'] = font_list
-        plt.rcParams['axes.unicode_minus'] = False
-        
-        # 为饼图专门设置字体
-        if 'streamlit' in sys.modules:
-            print("🔧 为饼图应用Streamlit环境字体设置")
-            plt.rcParams['font.sans-serif'] = ['Noto Sans SC'] + [f for f in font_list if f != 'Noto Sans SC']
-        
         fig, ax = plt.subplots(figsize=(10, 8))
         percentages = results.get('percentages', {})
         
@@ -794,7 +375,7 @@ def generate_chart_images(results, df_clean):
         if missing_data:
             print(f"警告：缺少百分比数据 {missing_data}")
         
-        labels = ['Blue\n(400-500nm)', 'Green\n(500-600nm)', 'Red\n(600-700nm)', 'Far Red\n(700-800nm)']
+        labels = ['蓝光\n(400-500nm)', '绿光\n(500-600nm)', '红光\n(600-700nm)', '远红光\n(700-800nm)']
         sizes = [
             percentages.get('blue_percentage', 0),
             percentages.get('green_percentage', 0),
@@ -806,136 +387,24 @@ def generate_chart_images(results, df_clean):
         
         colors_pie = ['#4285F4', '#34A853', '#EA4335', '#FB04DA']
         
-        # 确保font_list存在且不为空，增强Streamlit Cloud支持
-        print("🔧 为饼图进行字体环境检查")
-        if 'font_list' not in locals() or not font_list:
-            # 增强版Streamlit Cloud环境检测
-            is_streamlit_cloud = (
-                'streamlit' in sys.modules or 
-                os.environ.get('STREAMLIT_RUNTIME') == 'true' or 
-                os.environ.get('PWD', '').endswith('app') or
-                os.environ.get('HOME', '') == '/home/appuser' or
-                os.path.exists('/.dockerenv')
-            )
-            print(f"检测环境: Streamlit Cloud={is_streamlit_cloud}")
-            
-            if is_streamlit_cloud:
-                # Streamlit Cloud优先字体列表 - 增强版
-                font_list = ['Noto Sans SC', 'WenQuanYi Micro Hei', 'WenQuanYi Zen Hei', 'Droid Sans Fallback', 'Roboto', 'DejaVu Sans', 'Arial Unicode MS', 'sans-serif']
-                print("⚠️ 在Streamlit Cloud环境中重新初始化font_list，优先使用Noto Sans SC")
-            else:
-                # 标准环境字体列表
-                if platform.system() == 'Darwin':
-                    font_list = ['STHeiti', 'Arial Unicode MS', 'PingFang SC', 'sans-serif']
-                elif platform.system() == 'Windows':
-                    font_list = ['SimHei', 'Microsoft YaHei', 'Arial Unicode MS', 'sans-serif']
-                else:
-                    font_list = ['WenQuanYi Micro Hei', 'Droid Sans Fallback', 'DejaVu Sans', 'Arial Unicode MS', 'sans-serif']
-                print(f"⚠️ 重新初始化font_list: {font_list[:2]}...")
-        
-        # 智能字体选择：逐个验证字体是否可用
-        available_font = font_list[0]
-        # 增强版字体验证
-        for font_candidate in font_list:
-            try:
-                print(f"🔍 测试字体: {font_candidate}")
-                # 创建一个字体属性对象进行测试
-                test_font_prop = plt.font_manager.FontProperties(family=font_candidate)
-                # 检查字体是否真的被识别
-                if test_font_prop.get_name().lower() != 'sans-serif':
-                    available_font = font_candidate
-                    print(f"✓ 确认字体 {available_font} 可用")
-                    break
-            except Exception as e:
-                print(f"⚠️ 字体 {font_candidate} 测试失败: {e}")
-                continue
-        
-        # 设置字体
-        plt.rcParams['font.sans-serif'] = [available_font] + font_list[1:]
-        plt.rcParams['font.family'] = ['sans-serif']
-        print(f"✅ 饼图最终字体设置: {plt.rcParams['font.sans-serif'][:3]}...")
-        
-        # 显式设置字体参数
-        plt.rcParams['font.sans-serif'] = [available_font] + font_list[1:]
-        plt.rcParams['font.family'] = ['sans-serif']
-        plt.rcParams['axes.unicode_minus'] = False
-        plt.rcParams['pdf.fonttype'] = 42
-        plt.rcParams['ps.fonttype'] = 42
-        
-        # 为Streamlit Cloud环境添加PDF/PS渲染参数
-        if is_streamlit_cloud:
-            plt.rcParams['pdf.fonttype'] = 42
-            plt.rcParams['ps.fonttype'] = 42
-            plt.rcParams['text.antialiased'] = True
-            print("✅ 为Streamlit Cloud环境应用增强的字体和渲染设置")
-        
-        # 显式设置字体，增强多平台兼容性
-        font_family = available_font
-        print(f"饼图相关设置使用字体: {font_family}")
-        
-        # 强制设置字体参数，确保在无头环境中也能正常工作
-        plt.rcParams['font.family'] = ['sans-serif']
-        plt.rcParams['font.sans-serif'] = [font_family] + font_list[1:]
-        print(f"饼图使用字体: {font_family}")
-        
-        # 为饼图标签创建字体字典
-        label_font_dict = {'fontsize': 11, 'fontweight': 'bold', 'family': font_family}
-        title_font_dict = {'fontsize': 16, 'fontweight': 'bold', 'family': font_family}
-        
-        # 使用字体字典
         wedges, texts, autotexts = ax.pie(sizes, labels=labels, colors=colors_pie, autopct='%1.1f%%',
-                                         startangle=90, textprops=label_font_dict)
+                                         startangle=90, textprops={'fontsize': 11, 'fontweight': 'bold'})
         
         # 确保饼图标签使用正确字体
         for text in texts:
             text.set_fontweight('bold')
-            text.set_fontfamily(font_family)
         for autotext in autotexts:
             autotext.set_color('white')
             autotext.set_fontweight('bold')
             autotext.set_fontsize(10)
-            autotext.set_fontfamily(font_family)
             
-        # 使用字体字典
-        ax.set_title('Light Quality Distribution', pad=20, **title_font_dict)
-        print("✅ 饼图标题字体已设置")
+        ax.set_title('光质分布占比', fontsize=16, fontweight='bold', pad=20)
         
         plt.tight_layout()
         
-        # 保存前再次确认字体设置
-        print(f"保存饼图前的字体设置: {plt.rcParams['font.sans-serif']}")
-        
-        # 保存为字节流
         img_buffer = io.BytesIO()
-        
-        # 为Streamlit Cloud环境添加额外的保存参数
-        save_params = {
-            'format': 'png',
-            'dpi': 200,
-            'bbox_inches': 'tight',
-            'facecolor': 'white',
-            'edgecolor': 'none',
-            'pad_inches': 0.1,
-            'metadata': {'Title': 'Light Quality Distribution', 
-                        'Author': 'LED Plant Light Analysis System',
-                        'Creator': 'matplotlib'}
-        }
-        
-        # 在Streamlit环境中添加额外的字体渲染保障
-        if 'streamlit' in sys.modules:
-            print("🔧 在Streamlit环境中应用增强的饼图保存设置")
-            # 尝试使用不同的渲染后端选项
-            try:
-                import matplotlib.backends.backend_agg as agg
-                canvas = agg.FigureCanvasAgg(fig)
-                canvas.draw()
-                # 保存时强制使用文本模式而非路径模式
-                save_params['bbox_inches'] = 'tight'
-                save_params['pad_inches'] = 0.2  # 增加边距确保文字完整
-            except Exception as e:
-                print(f"⚠️ 饼图Canvas操作异常: {e}")
-        
-        plt.savefig(img_buffer, **save_params)
+        plt.savefig(img_buffer, format='png', dpi=300, bbox_inches='tight',
+                   facecolor='white', edgecolor='none')
         img_buffer.seek(0)
         chart_images['pie'] = img_buffer
         plt.close()
@@ -952,70 +421,6 @@ def generate_chart_images(results, df_clean):
         for cat, val in zip(categories, values):
             print(f"  {cat}: {val}分")
         
-        # 确保font_list存在且不为空，增强Streamlit Cloud支持
-        if 'font_list' not in locals() or not font_list:
-            # 增强版Streamlit Cloud环境检测
-            is_streamlit_cloud = (
-                'streamlit' in sys.modules or 
-                os.environ.get('STREAMLIT_RUNTIME') == 'true' or 
-                os.environ.get('PWD', '').endswith('app') or
-                os.environ.get('HOME', '') == '/home/appuser' or
-                os.path.exists('/.dockerenv')
-            )
-            print(f"检测环境: Streamlit Cloud={is_streamlit_cloud}")
-            
-            if is_streamlit_cloud:
-                # Streamlit Cloud优先字体列表 - 增强版
-                font_list = ['Noto Sans SC', 'WenQuanYi Micro Hei', 'WenQuanYi Zen Hei', 'Droid Sans Fallback', 'Roboto', 'DejaVu Sans', 'Arial Unicode MS', 'sans-serif']
-                print("⚠️ 在Streamlit Cloud环境中重新初始化font_list，优先使用Noto Sans SC")
-            else:
-                # 标准环境字体列表
-                if platform.system() == 'Darwin':
-                    font_list = ['STHeiti', 'Arial Unicode MS', 'PingFang SC', 'sans-serif']
-                elif platform.system() == 'Windows':
-                    font_list = ['SimHei', 'Microsoft YaHei', 'Arial Unicode MS', 'sans-serif']
-                else:
-                    font_list = ['WenQuanYi Micro Hei', 'Droid Sans Fallback', 'DejaVu Sans', 'Arial Unicode MS', 'sans-serif']
-                print(f"⚠️ 重新初始化font_list: {font_list[:2]}...")
-        
-        # 智能字体选择：逐个验证字体是否可用
-        available_font = font_list[0]
-        try:
-            test_font = available_font
-            plt.rcParams['font.sans-serif'] = [test_font]
-            plt.rcParams['font.family'] = ['sans-serif']
-            # 测试字体是否真的生效
-            test_fig, test_ax = plt.subplots(figsize=(1, 1))
-            test_ax.text(0.5, 0.5, '测试字体', fontsize=10)
-            plt.close(test_fig)
-            print(f"✓ 确认字体 {test_font} 可用")
-        except Exception as e:
-            print(f"⚠️ 字体 {available_font} 不可用: {e}")
-            # 尝试下一个字体
-            if len(font_list) > 1:
-                available_font = font_list[1]
-                print(f"尝试使用备用字体: {available_font}")
-        
-        # 显式设置字体参数
-        plt.rcParams['font.sans-serif'] = font_list
-        plt.rcParams['font.family'] = ['sans-serif']
-        plt.rcParams['axes.unicode_minus'] = False
-        
-        # 为Streamlit Cloud环境添加PDF/PS渲染参数
-        if is_streamlit_cloud:
-            plt.rcParams['pdf.fonttype'] = 42
-            plt.rcParams['ps.fonttype'] = 42
-            plt.rcParams['text.antialiased'] = True
-            print("✅ 为Streamlit Cloud环境应用增强的字体和渲染设置")
-        
-        # 显式设置雷达图字体，增强多平台兼容性
-        font_family = available_font
-        print(f"雷达图使用字体: {font_family}")
-        
-        # 强制设置字体参数，确保在无头环境中也能正常工作
-        plt.rcParams['font.family'] = ['sans-serif']
-        plt.rcParams['font.sans-serif'] = [font_family] + font_list[1:]
-        
         if categories and values:
             # 闭合雷达图
             angles = np.linspace(0, 2 * np.pi, len(categories), endpoint=False).tolist()
@@ -1025,47 +430,24 @@ def generate_chart_images(results, df_clean):
             ax.plot(angles, values, 'o-', linewidth=3, color='#4285F4', markersize=8)
             ax.fill(angles, values, alpha=0.25, color='#4285F4')
             ax.set_xticks(angles[:-1])
-            # 明确设置字体，增加额外的字体回退机制
-            try:
-                ax.set_xticklabels(categories, fontsize=12, fontweight='bold', fontfamily=font_family)
-            except:
-                # 如果第一个字体失败，尝试使用回退字体
-                for fallback_font in font_list[1:]:
-                    try:
-                        ax.set_xticklabels(categories, fontsize=12, fontweight='bold', fontfamily=fallback_font)
-                        print(f"⚠️ 切换到回退字体: {fallback_font}")
-                        break
-                    except:
-                        continue
+            ax.set_xticklabels(categories, fontsize=12, fontweight='bold')
             ax.set_ylim(0, 100)
             ax.set_yticks([20, 40, 60, 80, 100])
-            ax.set_yticklabels(['20', '40', '60', '80', '100'], fontsize=10, fontweight='bold', fontfamily=font_family)
-            ax.set_title('Crop Adaptability Evaluation', fontsize=16, fontweight='bold', pad=30, fontfamily=font_family)
+            ax.set_yticklabels(['20', '40', '60', '80', '100'], fontsize=10, fontweight='bold')
+            ax.set_title('作物适应性评价', fontsize=16, fontweight='bold', pad=30)
             ax.grid(True, alpha=0.6)
             
             # 设置网格线样式
             ax.grid(True, linestyle='--', alpha=0.7)
         else:
-            ax.text(0.5, 0.5, 'No Crop Adaptability Data', transform=ax.transAxes, 
-                   ha='center', va='center', fontsize=14, fontfamily=font_family)
+            ax.text(0.5, 0.5, '无作物适应性数据', transform=ax.transAxes, 
+                   ha='center', va='center', fontsize=14)
         
         plt.tight_layout()
         
-        # 保存前再次确认字体设置
-        print(f"保存雷达图前的字体设置: {plt.rcParams['font.sans-serif']}")
-        
-        # 保存为字节流
         img_buffer = io.BytesIO()
-        plt.savefig(img_buffer, 
-                   format='png', 
-                   dpi=200,  # 适当降低dpi以减小文件大小
-                   bbox_inches='tight',
-                   facecolor='white', 
-                   edgecolor='none',
-                   pad_inches=0.1,
-                   metadata={'Title': '作物适应性评价', 
-                            'Author': 'LED植物灯光效分析系统',
-                            'Creator': 'matplotlib'})
+        plt.savefig(img_buffer, format='png', dpi=300, bbox_inches='tight',
+                   facecolor='white', edgecolor='none')
         img_buffer.seek(0)
         chart_images['radar'] = img_buffer
         plt.close()
@@ -1120,105 +502,173 @@ def generate_pdf_report(results, df_clean):
     # 获取样式
     styles = getSampleStyleSheet()
     
-    # 设置适合英文显示的字体
-    pdf_font = 'Helvetica'  # 默认字体，适合英文
+    # 注册中文字体（优先使用本地字体，再尝试系统字体）
+    chinese_font = 'Helvetica'  # 默认字体
+    font_loaded = False
     try:
         import platform
         from reportlab.pdfbase import pdfmetrics
         from reportlab.pdfbase.ttfonts import TTFont
+        from reportlab.pdfbase.cidfonts import UnicodeCIDFont
         import reportlab.lib.fonts
         import os
-        import sys
         
-        # 检测是否在Streamlit Cloud环境
-        is_streamlit_cloud = False
-        if 'streamlit' in sys.modules:
-            is_streamlit_cloud = True
-            print("🌐 检测到Streamlit模块")
-        if os.environ.get('STREAMLIT_RUNTIME') == 'true':
-            is_streamlit_cloud = True
-            print("🌐 检测到STREAMLIT_RUNTIME环境变量")
+        # 获取系统信息
+        system = platform.system()
+        print(f"📊 系统信息: {system}")
         
-        print(f"📊 英文报告字体设置中...")
-        
-        # 优先使用标准英文字体或通用字体
-        # 尝试加载NotoSans字体（通用且支持多种语言）
+        # 首先尝试使用项目中的本地中文字体，检查多种可能的扩展名
         font_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'fonts')
-        noto_font_path = os.path.join(font_dir, 'NotoSans-Regular.ttf')
+        font_name = 'NotoSansSC-Regular'
+        possible_extensions = ['.ttf', '.otf', '.ttc']
+        local_font_path = None
         
-        if os.path.exists(noto_font_path):
+        # 查找可用的字体文件
+        for ext in possible_extensions:
+            test_path = os.path.join(font_dir, f"{font_name}{ext}")
+            if os.path.exists(test_path):
+                local_font_path = test_path
+                print(f"🔍 找到字体文件: {local_font_path}")
+                break
+        
+        # 尝试加载本地字体
+        if local_font_path:
             try:
-                # 注册NotoSans字体
-                pdfmetrics.registerFont(TTFont('NotoSans', noto_font_path))
-                pdf_font = 'NotoSans'
-                print(f"✅ 成功注册本地NotoSans字体: {noto_font_path}")
+                # 注册中文字体
+                pdfmetrics.registerFont(TTFont('ChineseFont', local_font_path))
+                # 注册字体映射，这对中文显示至关重要
+                pdfmetrics.registerFontFamily('ChineseFontFamily', normal='ChineseFont', bold='ChineseFont', italic='ChineseFont', boldItalic='ChineseFont')
+                # 设置默认字体映射
+                reportlab.lib.fonts.addMapping('ChineseFont', 0, 0, 'ChineseFont')  # 映射常规字体
+                reportlab.lib.fonts.addMapping('ChineseFont', 0, 1, 'ChineseFont')  # 映射粗体
+                reportlab.lib.fonts.addMapping('ChineseFont', 1, 0, 'ChineseFont')  # 映射斜体
+                reportlab.lib.fonts.addMapping('ChineseFont', 1, 1, 'ChineseFont')  # 映射粗斜体
+                
+                chinese_font = 'ChineseFont'
+                font_loaded = True
+                print(f"✅ 成功注册本地中文字体到PDF: {local_font_path}")
+                print(f"✅ 字体映射设置完成")
             except Exception as e:
-                print(f"⚠️ 注册NotoSans字体失败: {str(e)}")
+                print(f"⚠️ 注册本地字体到PDF失败: {str(e)}")
+                # 尝试替代方案 - 使用CID字体
+                try:
+                    pdfmetrics.registerFont(UnicodeCIDFont('STSong-Light'))
+                    pdfmetrics.registerFontFamily('STSong', normal='STSong-Light', bold='STSong-Light', italic='STSong-Light', boldItalic='STSong-Light')
+                    chinese_font = 'STSong-Light'
+                    font_loaded = True
+                    print(f"✅ 成功注册CID中文字体: STSong-Light")
+                except Exception as e2:
+                    print(f"⚠️ 注册CID字体失败: {str(e2)}")
         else:
-            # 尝试系统中的标准英文字体
-            system = platform.system()
-            print(f"🔍 系统: {system}，尝试加载系统英文字体")
+            print(f"❌ 未找到字体文件在: {font_dir}")
+        
+        # 如果本地字体加载失败，尝试系统字体
+        if not font_loaded:
+            print("🔄 尝试加载系统中文字体...")
             
-            # 根据系统设置可能的英文字体路径
-            font_paths = []
-            
-            if is_streamlit_cloud:
-                print(f"🔍 Streamlit Cloud环境: 尝试加载DejaVu Sans")
+            # 根据系统设置字体路径
+            if system == "Windows":
+                # Windows系统尝试多种中文字体
                 font_paths = [
-                    ('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf', 'DejaVuSans'),
-                    ('/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf', 'NotoSans')
+                    ('C:/Windows/Fonts/simhei.ttf', 'SimHei'),       # 黑体
+                    ('C:/Windows/Fonts/simsun.ttc', 'SimSun'),       # 宋体
+                    ('C:/Windows/Fonts/msyh.ttc', 'MicrosoftYaHei'), # 微软雅黑
+                    ('C:/Windows/Fonts/simkai.ttf', 'KaiTi')         # 楷体
                 ]
-            elif system == "Windows":
+                print(f"🔍 Windows系统: 尝试加载以下字体")
+                
+            elif system == "Darwin":  # macOS
+                # macOS系统尝试多种中文字体
                 font_paths = [
-                    ('C:/Windows/Fonts/arial.ttf', 'Arial'),
-                    ('C:/Windows/Fonts/segoeui.ttf', 'SegoeUI')
+                    ('/System/Library/Fonts/PingFang.ttc', 'PingFangSC'),
+                    ('/System/Library/Fonts/STSong.ttc', 'STSong'),
+                    ('/System/Library/Fonts/STHeiti Light.ttc', 'STHeiti'),
+                    ('/System/Library/Fonts/STKaiti.ttc', 'STKaiti')
                 ]
-            elif system == "Darwin":
+                print(f"🔍 macOS系统: 尝试加载以下字体")
+                
+            else:  # Linux系统
+                # Linux系统尝试常见中文字体路径
                 font_paths = [
-                    ('/System/Library/Fonts/Helvetica.ttc', 'Helvetica'),
-                    ('/System/Library/Fonts/SFPro.ttf', 'SFPro')
+                    ('/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf', 'DroidSansFallback'),
+                    ('/usr/share/fonts/truetype/wqy/wqy-microhei.ttc', 'WenQuanYiMicroHei'),
+                    ('/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc', 'WenQuanYiZenHei'),
+                    ('/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc', 'NotoSansCJK')
                 ]
-            else:  # Linux
-                font_paths = [
-                    ('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf', 'DejaVuSans'),
-                    ('/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf', 'NotoSans')
-                ]
+                print(f"🔍 Linux系统: 尝试加载以下字体")
             
             # 尝试加载系统字体
             for font_path, font_alias in font_paths:
+                print(f"   - {font_alias}: {font_path}")
                 if os.path.exists(font_path):
                     try:
+                        print(f"   ↳ 找到字体文件，尝试注册...")
+                        # 注册字体
                         if font_path.endswith('.ttf'):
                             pdfmetrics.registerFont(TTFont(font_alias, font_path))
                         else:  # .ttc files
                             pdfmetrics.registerFont(TTFont(font_alias, font_path, subfontIndex=0))
                         
-                        pdf_font = font_alias
-                        print(f"✅ 成功注册系统字体: {font_alias}")
+                        # 注册字体映射
+                        pdfmetrics.registerFontFamily(f'{font_alias}Family', 
+                                                    normal=font_alias, 
+                                                    bold=font_alias, 
+                                                    italic=font_alias, 
+                                                    boldItalic=font_alias)
+                        
+                        # 设置字体映射
+                        reportlab.lib.fonts.addMapping(font_alias, 0, 0, font_alias)  # 映射常规字体
+                        reportlab.lib.fonts.addMapping(font_alias, 0, 1, font_alias)  # 映射粗体
+                        reportlab.lib.fonts.addMapping(font_alias, 1, 0, font_alias)  # 映射斜体
+                        reportlab.lib.fonts.addMapping(font_alias, 1, 1, font_alias)  # 映射粗斜体
+                        
+                        chinese_font = font_alias
+                        font_loaded = True
+                        print(f"✅ 成功注册系统字体: {font_alias} ({font_path})")
+                        print(f"✅ 字体映射设置完成")
                         break
                     except Exception as e:
-                        print(f"⚠️ 注册字体 {font_alias} 失败: {str(e)}")
+                        print(f"⚠️ 注册字体失败: {str(e)}")
                         continue
             
+            # 如果仍然没有加载到字体，尝试默认CID字体
+            if not font_loaded:
+                print("🔄 尝试加载默认CID中文字体...")
+                try:
+                    pdfmetrics.registerFont(UnicodeCIDFont('STSong-Light'))
+                    pdfmetrics.registerFontFamily('STSong', 
+                                                normal='STSong-Light', 
+                                                bold='STSong-Light', 
+                                                italic='STSong-Light', 
+                                                boldItalic='STSong-Light')
+                    chinese_font = 'STSong-Light'
+                    font_loaded = True
+                    print(f"✅ 成功注册CID中文字体: STSong-Light")
+                except Exception as e:
+                    print(f"⚠️ 注册CID字体失败: {str(e)}")
+                        
     except Exception as e:
-        print(f"⚠️ 字体注册过程中发生异常: {str(e)}")
-        print("📋 将使用默认字体Helvetica")
+        print(f"❌ 字体注册异常: {str(e)}")
+        # 最后的尝试 - 直接设置reportlab支持中文的默认字体
+        try:
+            from reportlab.pdfbase.cidfonts import UnicodeCIDFont
+            pdfmetrics.registerFont(UnicodeCIDFont('STSong-Light'))
+            pdfmetrics.registerFontFamily('STSong', 
+                                        normal='STSong-Light', 
+                                        bold='STSong-Light', 
+                                        italic='STSong-Light', 
+                                        boldItalic='STSong-Light')
+            chinese_font = 'STSong-Light'
+            font_loaded = True
+            print(f"✅ 异常恢复: 成功注册CID中文字体")
+        except Exception as e2:
+            print(f"❌ 无法恢复: {str(e2)}")
+            chinese_font = 'Helvetica'  # 最后回退到默认字体
     
-    print(f"📋 最终使用字体: {pdf_font}")
+    print(f"📋 最终使用字体: {chinese_font}")
     
-    # 为Streamlit Cloud环境添加额外的字体安全保障
-    if is_streamlit_cloud:
-        print("✅ 在Streamlit Cloud环境中应用增强的PDF渲染设置")
-        # 确保使用可靠的字体
-        print(f"📋 使用字体: {pdf_font}")
-    
-    # 使用pdf_font变量确保英文显示
-    pdf_font = pdf_font
-    print(f"📋 PDF报告字体已设置为: {pdf_font}")
-    
-    # 创建自定义样式（英文优先）
-    # 确保使用标准英文字体
-    # 对于英文文本，移除CJK换行参数
+    # 创建自定义样式（支持中文）
+    # 为每种样式添加字体回退机制
     title_style = ParagraphStyle(
         'CustomTitle',
         parent=styles['Heading1'],
@@ -1226,7 +676,8 @@ def generate_pdf_report(results, df_clean):
         spaceAfter=30,
         alignment=1,  # 居中
         textColor=colors.darkblue,
-        fontName=pdf_font
+        fontName=chinese_font,
+        wordWrap='CJK'  # 对中文文本进行适当的换行处理
     )
     
     heading_style = ParagraphStyle(
@@ -1235,7 +686,8 @@ def generate_pdf_report(results, df_clean):
         fontSize=14,
         spaceAfter=12,
         textColor=colors.darkblue,
-        fontName=pdf_font
+        fontName=chinese_font,
+        wordWrap='CJK'
     )
     
     subheading_style = ParagraphStyle(
@@ -1244,7 +696,8 @@ def generate_pdf_report(results, df_clean):
         fontSize=12,
         spaceAfter=8,
         textColor=colors.darkgreen,
-        fontName=pdf_font
+        fontName=chinese_font,
+        wordWrap='CJK'
     )
     
     normal_style = ParagraphStyle(
@@ -1252,8 +705,9 @@ def generate_pdf_report(results, df_clean):
         parent=styles['Normal'],
         fontSize=10,
         spaceAfter=6,
-        fontName=pdf_font,
-        encoding='UTF-8'
+        fontName=chinese_font,
+        wordWrap='CJK',
+        encoding='UTF-8'  # 明确指定编码为UTF-8
     )
     
     # 添加表格文本专用样式
@@ -1261,41 +715,42 @@ def generate_pdf_report(results, df_clean):
         'CustomTable',
         parent=styles['Normal'],
         fontSize=9,
-        fontName=pdf_font,
+        fontName=chinese_font,
+        wordWrap='CJK',
         encoding='UTF-8'
     )
     
-    print("📝 PDF样式创建完成，所有样式已应用英文字体设置")
+    print("📝 PDF样式创建完成，所有样式已应用中文字体设置")
     
     # 内容列表
     story = []
     
     # 标题
-    title = Paragraph("LED Plant Lighting Optical Measurement System Analysis Report", title_style)
+    title = Paragraph("LED植物照明光学度量体系分析报告", title_style)
     story.append(title)
     story.append(Spacer(1, 20))
     
     # 报告生成时间
     current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    time_para = Paragraph(f"Report Generated Time: {current_time}", normal_style)
+    time_para = Paragraph(f"报告生成时间：{current_time}", normal_style)
     story.append(time_para)
     story.append(Spacer(1, 20))
     
     # 基本信息
-    story.append(Paragraph("Test Basic Information", heading_style))
+    story.append(Paragraph("测试基本信息", heading_style))
     
     basic_info = results.get('basic_info', {})
     input_params = results.get('input_params', {})
     
     basic_data = [
-        ['Item', 'Value'],
-        ['Lamp Model', basic_info.get('lamp_model', 'Not filled')],
-        ['Manufacturer/Unit', basic_info.get('manufacturer', 'Not filled')],
-        ['Test Date', basic_info.get('test_date', 'Not filled')],
-        ['Total Radiation Flux', f"{input_params.get('total_radiation_flux', 0):.1f} W"],
-        ['Total Power', f"{input_params.get('total_power', 0):.1f} W"],
-        ['Back Panel Temperature', f"{input_params.get('back_panel_temp', 0):.1f} °C"],
-        ['Power Factor', f"{input_params.get('power_factor', 0):.3f}"]
+        ['项目', '数值'],
+        ['灯具型号', basic_info.get('lamp_model', '未填写')],
+        ['制造商/单位', basic_info.get('manufacturer', '未填写')],
+        ['测试日期', basic_info.get('test_date', '未填写')],
+        ['总辐射通量', f"{input_params.get('total_radiation_flux', 0):.1f} W"],
+        ['总功率', f"{input_params.get('total_power', 0):.1f} W"],
+        ['后面板温度', f"{input_params.get('back_panel_temp', 0):.1f} ℃"],
+        ['功率因数', f"{input_params.get('power_factor', 0):.3f}"]
     ]
     
     basic_table = Table(basic_data, colWidths=[2*inch, 3*inch])
@@ -1303,7 +758,7 @@ def generate_pdf_report(results, df_clean):
         ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
         ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-        ('FONTNAME', (0, 0), (-1, -1), pdf_font),  # 使用英文字体
+        ('FONTNAME', (0, 0), (-1, -1), chinese_font),  # 使用中文字体
         ('FONTSIZE', (0, 0), (-1, 0), 12),
         ('FONTSIZE', (0, 1), (-1, -1), 10),
         ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
@@ -1315,22 +770,22 @@ def generate_pdf_report(results, df_clean):
     story.append(Spacer(1, 20))
     
     # 综合评价
-    story.append(Paragraph("Comprehensive Evaluation", heading_style))
+    story.append(Paragraph("综合评价", heading_style))
     
     calculations = results.get('calculations', {})
     
     # 综合评价表格
     eval_data = [
-        ['Evaluation Item', 'Value', 'Level'],
-        ['Overall Rating', f"{calculations.get('quality_rating', 'Unknown')}", ''],
-        ['PPE (Photosynthetic Photon Efficiency)', f"{calculations.get('ppe', 0):.3f} μmol/J", 
-         "Excellent" if calculations.get('ppe', 0) > 2.5 else "Good" if calculations.get('ppe', 0) > 2.0 else "Fair"],
-        ['PAR Percentage', f"{calculations.get('par_ratio', 0)*100:.1f}%", 
-         "Excellent" if calculations.get('par_ratio', 0) > 0.8 else "Good" if calculations.get('par_ratio', 0) > 0.6 else "Fair"],
-        ['R/B Ratio', f"{calculations.get('r_b_ratio', 0):.2f}", 
-         "Suitable" if 0.5 <= calculations.get('r_b_ratio', 0) <= 3.0 else "Deviated"],
-        ['Light Energy Ratio', f"{calculations.get('light_energy_ratio', 0):.3f}", 
-         "High Efficiency" if calculations.get('light_energy_ratio', 0) > 0.5 else "Medium" if calculations.get('light_energy_ratio', 0) > 0.3 else "Low Efficiency"]
+        ['评价项目', '数值', '等级'],
+        ['总体评级', f"{calculations.get('quality_rating', '未知')}", ''],
+        ['PPE (光合光子效率)', f"{calculations.get('ppe', 0):.3f} μmol/J", 
+         "优秀" if calculations.get('ppe', 0) > 2.5 else "良好" if calculations.get('ppe', 0) > 2.0 else "一般"],
+        ['PAR占比', f"{calculations.get('par_ratio', 0)*100:.1f}%", 
+         "优秀" if calculations.get('par_ratio', 0) > 0.8 else "良好" if calculations.get('par_ratio', 0) > 0.6 else "一般"],
+        ['R/B比', f"{calculations.get('r_b_ratio', 0):.2f}", 
+         "适宜" if 0.5 <= calculations.get('r_b_ratio', 0) <= 3.0 else "偏离"],
+        ['光能比', f"{calculations.get('light_energy_ratio', 0):.3f}", 
+         "高效" if calculations.get('light_energy_ratio', 0) > 0.5 else "中等" if calculations.get('light_energy_ratio', 0) > 0.3 else "低效"]
     ]
     
     eval_table = Table(eval_data, colWidths=[2*inch, 2*inch, 1.5*inch])
@@ -1338,7 +793,7 @@ def generate_pdf_report(results, df_clean):
         ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('FONTNAME', (0, 0), (-1, -1), pdf_font),
+        ('FONTNAME', (0, 0), (-1, -1), chinese_font),
         ('FONTSIZE', (0, 0), (-1, 0), 10),
         ('FONTSIZE', (0, 1), (-1, -1), 9),
         ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
@@ -1350,17 +805,17 @@ def generate_pdf_report(results, df_clean):
     story.append(Spacer(1, 20))
     
     # 核心性能指标
-    story.append(Paragraph("Core Performance Indicators", heading_style))
+    story.append(Paragraph("核心性能指标", heading_style))
     
     performance_data = [
-        ['Indicator', 'Value', 'Unit', 'Description'],
-        ['Total Photon Flux', f"{calculations.get('total_photon_flux', 0):.2f}", 'μmol/s', 'Total Radiation Flux × Light Energy Ratio'],
-        ['PAR Power', f"{calculations.get('par_power', 0):.2f}", 'W', 'PAR band (400-700nm) power'],
-        ['Luminous Efficacy', f"{calculations.get('luminous_efficacy', 0):.3f}", 'W/W', 'Radiation efficacy'],
-        ['Estimated PPFD', f"{calculations.get('ppfd_estimated', 0):.0f}", 'μmol/m²/s', 'Light intensity assuming 1m² area'],
-        ['Light Energy Utilization Efficiency', f"{calculations.get('light_energy_efficiency', 0)*100:.1f}", '%', 'Ratio of PAR power to total power'],
-        ['Heat Loss Rate', f"{calculations.get('heat_loss_rate', 0)*100:.1f}", '%', 'Ratio of power converted to heat'],
-        ['Annual Electricity Cost', f"{calculations.get('annual_electricity_cost', 0):.0f}", 'USD', 'Estimated based on 12 hours/day operation']
+        ['指标', '数值', '单位', '说明'],
+        ['总光子通量', f"{calculations.get('total_photon_flux', 0):.2f}", 'μmol/s', '总辐射通量×光能比'],
+        ['PAR功率', f"{calculations.get('par_power', 0):.2f}", 'W', 'PAR波段(400-700nm)功率'],
+        ['光效', f"{calculations.get('luminous_efficacy', 0):.3f}", 'W/W', '辐射光效'],
+        ['估算PPFD', f"{calculations.get('ppfd_estimated', 0):.0f}", 'μmol/m²/s', '假设1m²面积的光强'],
+        ['光能利用效率', f"{calculations.get('light_energy_efficiency', 0)*100:.1f}", '%', 'PAR功率占总功率比例'],
+        ['热损失率', f"{calculations.get('heat_loss_rate', 0)*100:.1f}", '%', '转化为热量的功率比例'],
+        ['年度电费', f"{calculations.get('annual_electricity_cost', 0):.0f}", '元', '按12小时/天运行估算']
     ]
     
     performance_table = Table(performance_data, colWidths=[1.5*inch, 1.2*inch, 0.8*inch, 2*inch])
@@ -1368,7 +823,7 @@ def generate_pdf_report(results, df_clean):
         ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('FONTNAME', (0, 0), (-1, -1), pdf_font),
+        ('FONTNAME', (0, 0), (-1, -1), chinese_font),
         ('FONTSIZE', (0, 0), (-1, 0), 9),
         ('FONTSIZE', (0, 1), (-1, -1), 8),
         ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
@@ -1384,7 +839,7 @@ def generate_pdf_report(results, df_clean):
     
     # 添加光谱分布图（修复长宽比）
     if 'spectrum' in chart_images:
-        story.append(Paragraph("Spectral Distribution Analysis", heading_style))
+        story.append(Paragraph("光谱分布分析", heading_style))
         chart_images['spectrum'].seek(0)
         
         # 获取图片实际尺寸并保持长宽比
@@ -1419,23 +874,23 @@ def generate_pdf_report(results, df_clean):
             story.append(img)
             story.append(Spacer(1, 20))
         except Exception as e:
-            story.append(Paragraph(f"Spectrum chart loading failed: {str(e)}", normal_style))
+            story.append(Paragraph(f"光谱图加载失败: {str(e)}", normal_style))
             story.append(Spacer(1, 20))
     
-    # Spectrum distribution data table
-    story.append(Paragraph("Spectral Distribution Data", subheading_style))
+    # 光谱分布数据表
+    story.append(Paragraph("光谱分布数据", subheading_style))
     
     percentages = results.get('percentages', {})
     spectrum_data = [
-        ['Spectral Band', 'Wavelength Range', 'Integration Value', 'Percentage', 'Characteristics'],
-        ['Blue Light', '400-500 nm', f"{calculations.get('blue_integration', 0):.2f}", 
-         f"{percentages.get('blue_percentage', 0):.1f}%", 'Promotes chlorophyll synthesis'],
-        ['Green Light', '500-600 nm', f"{calculations.get('green_integration', 0):.2f}", 
-         f"{percentages.get('green_percentage', 0):.1f}%", 'Lower photosynthetic efficiency'],
-        ['Red Light', '600-700 nm', f"{calculations.get('red_integration', 0):.2f}", 
-         f"{percentages.get('red_percentage', 0):.1f}%", 'Promotes flowering and fruiting'],
-        ['Far Red Light', '700-800 nm', f"{calculations.get('far_red_integration', 0):.2f}", 
-         f"{percentages.get('far_red_percentage', 0):.1f}%", 'Regulates stem elongation']
+        ['光谱波段', '波长范围', '积分值', '占比', '特性'],
+        ['蓝光', '400-500 nm', f"{calculations.get('blue_integration', 0):.2f}", 
+         f"{percentages.get('blue_percentage', 0):.1f}%", '促进叶绿素合成'],
+        ['绿光', '500-600 nm', f"{calculations.get('green_integration', 0):.2f}", 
+         f"{percentages.get('green_percentage', 0):.1f}%", '光合效率较低'],
+        ['红光', '600-700 nm', f"{calculations.get('red_integration', 0):.2f}", 
+         f"{percentages.get('red_percentage', 0):.1f}%", '促进开花结果'],
+        ['远红光', '700-800 nm', f"{calculations.get('far_red_integration', 0):.2f}", 
+         f"{percentages.get('far_red_percentage', 0):.1f}%", '调节茎伸长']
     ]
     
     spectrum_table = Table(spectrum_data, colWidths=[1.2*inch, 1.2*inch, 1.2*inch, 1*inch, 1.4*inch])
@@ -1443,7 +898,7 @@ def generate_pdf_report(results, df_clean):
         ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('FONTNAME', (0, 0), (-1, -1), pdf_font),
+        ('FONTNAME', (0, 0), (-1, -1), chinese_font),
         ('FONTSIZE', (0, 0), (-1, 0), 9),
         ('FONTSIZE', (0, 1), (-1, -1), 8),
         ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
@@ -1456,7 +911,7 @@ def generate_pdf_report(results, df_clean):
     
     # 添加光质分布饼图（修复长宽比）
     if 'pie' in chart_images:
-        story.append(Paragraph("Light Quality Distribution", subheading_style))
+        story.append(Paragraph("光质分布占比", subheading_style))
         chart_images['pie'].seek(0)
         
         # 获取饼图实际尺寸并保持长宽比
@@ -1489,18 +944,18 @@ def generate_pdf_report(results, df_clean):
             story.append(img)
             story.append(Spacer(1, 20))
         except Exception as e:
-            story.append(Paragraph(f"Pie chart loading failed: {str(e)}", normal_style))
+            story.append(Paragraph(f"饼图加载失败: {str(e)}", normal_style))
             story.append(Spacer(1, 20))
     
-    # Plant physiological response indicators
-    story.append(Paragraph("Plant Physiological Response Indicators", heading_style))
+    # 植物生理响应指标
+    story.append(Paragraph("植物生理响应指标", heading_style))
     
     physio_data = [
-        ['Indicator', 'Value', 'Mechanism', 'Effect'],
-        ['Cryptochrome Activity', f"{calculations.get('crypto_activity', 0):.3f}", 'Senses blue light and UV-A', 'Regulates phototropism and circadian clock'],
-        ['Phytochrome Activity', f"{calculations.get('phyto_activity', 0):.3f}", 'Senses red/far-red light', 'Regulates photoperiodic responses'],
-        ['Anthocyanin Synthesis Index', f"{calculations.get('anthocyanin_index', 0):.3f}", 'Induced by purple and blue light', 'Enhances stress resistance and coloring'],
-        ['Chlorophyll Synthesis Index', f"{calculations.get('chlorophyll_synthesis', 0):.3f}", 'Synergistic effect of red and blue light', 'Promotes photosynthetic pigment formation']
+        ['指标', '数值', '作用机制', '影响'],
+        ['隐花色素活性', f"{calculations.get('crypto_activity', 0):.3f}", '感受蓝光和UV-A', '调节向光性和生物钟'],
+        ['光敏色素活性', f"{calculations.get('phyto_activity', 0):.3f}", '感受红光/远红光', '调节光周期响应'],
+        ['花青素合成指数', f"{calculations.get('anthocyanin_index', 0):.3f}", '紫光和蓝光诱导', '提高抗逆性和着色'],
+        ['叶绿素合成指数', f"{calculations.get('chlorophyll_synthesis', 0):.3f}", '红蓝光协同作用', '促进光合色素形成']
     ]
     
     physio_table = Table(physio_data, colWidths=[1.5*inch, 1*inch, 1.8*inch, 1.7*inch])
@@ -1508,7 +963,7 @@ def generate_pdf_report(results, df_clean):
         ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
         ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-        ('FONTNAME', (0, 0), (-1, -1), pdf_font),
+        ('FONTNAME', (0, 0), (-1, -1), chinese_font),
         ('FONTSIZE', (0, 0), (-1, 0), 9),
         ('FONTSIZE', (0, 1), (-1, -1), 8),
         ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
@@ -1521,7 +976,7 @@ def generate_pdf_report(results, df_clean):
     
     # 添加作物适应性雷达图（修复长宽比）
     if 'radar' in chart_images:
-        story.append(Paragraph("Crop Adaptability Evaluation", heading_style))
+        story.append(Paragraph("作物适应性评价", heading_style))
         chart_images['radar'].seek(0)
         
         # 雷达图通常也接近正方形
@@ -1553,38 +1008,35 @@ def generate_pdf_report(results, df_clean):
             story.append(img)
             story.append(Spacer(1, 20))
         except Exception as e:
-            story.append(Paragraph(f"Radar chart loading failed: {str(e)}", normal_style))
+            story.append(Paragraph(f"雷达图加载失败: {str(e)}", normal_style))
             story.append(Spacer(1, 20))
     
-    # Crop adaptability data table
+    # 作物适应性数据表
     crop_suitability = calculations.get('crop_suitability', {})
-    crop_data = [['Crop Type', 'Adaptability Score', 'Evaluation Level', 'Recommended Applications']]
+    crop_data = [['作物类型', '适应性评分', '评价等级', '推荐应用']]
     
     crop_recommendations = {
-        'Leafy Vegetables': 'Lettuce, Spinach, Bok choy, Celery',
-        'Fruiting Vegetables': 'Tomato, Cucumber, Pepper, Eggplant',
-        'Seedling Growth': 'Various vegetable seedlings, Flower seedlings'
+        '叶菜类': '生菜、菠菜、小白菜、芹菜',
+        '果菜类': '番茄、黄瓜、辣椒、茄子',
+        '育苗专用': '各类蔬菜育苗、花卉育苗'
     }
     
     for crop_type, score in crop_suitability.items():
-        # Convert Chinese crop types to English for consistency
-        en_crop_type = {'叶菜类': 'Leafy Vegetables', '果菜类': 'Fruiting Vegetables', '育苗专用': 'Seedling Growth'}.get(crop_type, crop_type)
-        
         if score >= 80:
-            level = "Excellent"
+            level = "优秀"
         elif score >= 60:
-            level = "Good"
+            level = "良好"
         else:
-            level = "Fair"
-        recommendation = crop_recommendations.get(en_crop_type, 'General')
-        crop_data.append([en_crop_type, f"{score}", level, recommendation])
+            level = "一般"
+        recommendation = crop_recommendations.get(crop_type, '通用')
+        crop_data.append([crop_type, f"{score}分", level, recommendation])
     
     crop_table = Table(crop_data, colWidths=[1.5*inch, 1.2*inch, 1*inch, 2.3*inch])
     crop_table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('FONTNAME', (0, 0), (-1, -1), pdf_font),
+        ('FONTNAME', (0, 0), (-1, -1), chinese_font),
         ('FONTSIZE', (0, 0), (-1, 0), 9),
         ('FONTSIZE', (0, 1), (-1, -1), 8),
         ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
@@ -1595,34 +1047,31 @@ def generate_pdf_report(results, df_clean):
     story.append(crop_table)
     story.append(Spacer(1, 20))
     
-    # Growth stage adaptability
-    story.append(Paragraph("Growth Stage Adaptability Analysis", heading_style))
+    # 生长阶段适配性
+    story.append(Paragraph("生长阶段适配性分析", heading_style))
     
     growth_stages = calculations.get('growth_stage_suitability', {})
     if growth_stages:
-        growth_data = [['Growth Stage', 'Adaptability Score', 'Spectral Requirements']]
+        growth_data = [['生长阶段', '适配性评分', '光谱特点需求']]
         
         stage_requirements = {
-            'Germination': 'Moderate blue and red light, promotes germination',
-            'Seedling': 'High blue light ratio, controls excessive growth',
-            'Vegetative Growth': 'Balanced red and blue light, promotes leaf development',
-            'Flowering': 'High red light ratio, promotes flower bud differentiation',
-            'Fruiting': 'Balanced spectrum, high light intensity requirement'
+            '发芽期': '适量蓝光和红光，促进发芽',
+            '苗期': '高蓝光比例，控制徒长',
+            '营养生长期': '平衡红蓝光，促进叶片发育',
+            '开花期': '高红光比例，促进花芽分化',
+            '结果期': '均衡光谱，高光强需求'
         }
         
         for stage, score in growth_stages.items():
-            # Convert Chinese growth stages to English
-            en_stage = {'发芽期': 'Germination', '苗期': 'Seedling', '营养生长期': 'Vegetative Growth', 
-                       '开花期': 'Flowering', '结果期': 'Fruiting'}.get(stage, stage)
-            requirement = stage_requirements.get(en_stage, 'Balanced spectrum')
-            growth_data.append([en_stage, f"{score}", requirement])
+            requirement = stage_requirements.get(stage, '平衡光谱')
+            growth_data.append([stage, f"{score}分", requirement])
         
         growth_table = Table(growth_data, colWidths=[1.5*inch, 1.5*inch, 3*inch])
         growth_table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
             ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('FONTNAME', (0, 0), (-1, -1), pdf_font),
+            ('FONTNAME', (0, 0), (-1, -1), chinese_font),
             ('FONTSIZE', (0, 0), (-1, 0), 9),
             ('FONTSIZE', (0, 1), (-1, -1), 8),
             ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
@@ -1633,40 +1082,31 @@ def generate_pdf_report(results, df_clean):
         story.append(growth_table)
         story.append(Spacer(1, 20))
     
-    # Optimization suggestions
-    story.append(Paragraph("Spectral Optimization Suggestions", heading_style))
+    # 优化建议
+    story.append(Paragraph("光谱优化建议", heading_style))
     
     suggestions = calculations.get('optimization_suggestions', [])
-    # Convert Chinese suggestions to English or use directly if already in English
-    en_suggestions = []
-    for suggestion in suggestions:
-        if "较为合理" in suggestion:
-            en_suggestions.append("The spectrum is relatively reasonable")
-        else:
-            # Keep the original suggestion for now - in a real scenario we would translate all suggestions
-            en_suggestions.append(suggestion)
-    
-    if len(en_suggestions) == 1 and "relatively reasonable" in en_suggestions[0]:
-        suggestion_text = f"✓ {en_suggestions[0]}"
+    if len(suggestions) == 1 and "较为合理" in suggestions[0]:
+        suggestion_text = f"✓ {suggestions[0]}"
     else:
-        suggestion_text = "The following optimization items were detected:<br/>"
-        for i, suggestion in enumerate(en_suggestions, 1):
+        suggestion_text = "检测到以下可优化项目：<br/>"
+        for i, suggestion in enumerate(suggestions, 1):
             suggestion_text += f"{i}. {suggestion}<br/>"
     
     story.append(Paragraph(suggestion_text, normal_style))
     story.append(Spacer(1, 20))
     
-    # Detailed calculation data
-    story.append(Paragraph("Detailed Calculation Data", heading_style))
+    # 详细计算数据
+    story.append(Paragraph("详细计算数据", heading_style))
     
     calculation_data = [
-        ['Calculation Item', 'Value', 'Formula/Explanation'],
-        ['Photosynthetic Active Integration', f"{calculations.get('photosynthetic_active', 0):.2f}", 'Σ(λ×radiation)/119.8'],
-        ['Total Integration', f"{calculations.get('total_integration', 0):.2f}", 'Σradiation values'],
-        ['PAR Integration', f"{calculations.get('par_integration', 0):.2f}", 'Sum of radiation values 400-700nm'],
-        ['R/Fr Ratio', f"{calculations.get('r_fr_ratio', 0):.2f}", 'Red light integration/Far red light integration'],
-        ['UV-A/B Ratio', f"{calculations.get('uva_b_ratio', 0):.3f}", 'UV-A integration/Blue light integration'],
-        ['DLI', f"{calculations.get('dli', 0):.2f}", 'Total photon flux×12×3600/1000000 mol/m²/d']
+        ['计算项目', '数值', '计算公式/说明'],
+        ['光合有效积分', f"{calculations.get('photosynthetic_active', 0):.2f}", 'Σ(λ×辐射)/119.8'],
+        ['总积分', f"{calculations.get('total_integration', 0):.2f}", 'Σ辐射值'],
+        ['PAR积分', f"{calculations.get('par_integration', 0):.2f}", '400-700nm辐射值总和'],
+        ['R/Fr比', f"{calculations.get('r_fr_ratio', 0):.2f}", '红光积分/远红光积分'],
+        ['UV-A/B比', f"{calculations.get('uva_b_ratio', 0):.3f}", 'UV-A积分/蓝光积分'],
+        ['DLI', f"{calculations.get('dli', 0):.2f}", '总光子通量×12×3600/1000000 mol/m²/d']
     ]
     
     calc_table = Table(calculation_data, colWidths=[2*inch, 1.5*inch, 2.5*inch])
@@ -1674,7 +1114,7 @@ def generate_pdf_report(results, df_clean):
         ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
         ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-        ('FONTNAME', (0, 0), (-1, -1), pdf_font),
+        ('FONTNAME', (0, 0), (-1, -1), chinese_font),
         ('FONTSIZE', (0, 0), (-1, 0), 9),
         ('FONTSIZE', (0, 1), (-1, -1), 8),
         ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
@@ -1685,36 +1125,36 @@ def generate_pdf_report(results, df_clean):
     story.append(calc_table)
     story.append(Spacer(1, 20))
     
-    # Analysis method description
-    story.append(Paragraph("Analysis Method Description", heading_style))
+    # 分析方法说明
+    story.append(Paragraph("分析方法说明", heading_style))
     
     method_text = """
-    Core Calculation Formulas:<br/>
-    • Light Energy Ratio = Photosynthetic Active Integration ÷ Total Integration<br/>
-    • Total Photon Flux = Total Radiation Flux × Light Energy Ratio (μmol/s)<br/>
-    • PPE = Total Photon Flux ÷ Total Power (μmol/J)<br/>
-    • Integration Value = (λ × Radiation) ÷ 119.8 (Photon energy conversion constant)<br/>
+    核心计算公式：<br/>
+    • 光能比 = 光合有效积分 ÷ 总积分<br/>
+    • 总光子通量 = 总辐射通量 × 光能比 (μmol/s)<br/>
+    • PPE = 总光子通量 ÷ 总功率 (μmol/J)<br/>
+    • 积分值 = (λ × 辐射) ÷ 119.8（光子能量转换常数）<br/>
     <br/>
-    Evaluation Standards:<br/>
-    • PPE Grade: Excellent(>2.5), Good(2.0-2.5), Fair(<2.0) μmol/J<br/>
-    • PAR Percentage Grade: Excellent(>80%), Good(60-80%), Fair(<60%)<br/>
-    • R/B Ratio Range: Leafy vegetables(0.5-1.5), Fruiting vegetables(1.0-3.0)<br/>
-    • Light Energy Ratio: High efficiency(>0.5), Medium(0.3-0.5), Low efficiency(<0.3)<br/>
+    评价标准：<br/>
+    • PPE等级: 优秀(>2.5), 良好(2.0-2.5), 一般(<2.0) μmol/J<br/>
+    • PAR占比等级: 优秀(>80%), 良好(60-80%), 一般(<60%)<br/>
+    • R/B比值范围: 叶菜类(0.5-1.5), 果菜类(1.0-3.0)<br/>
+    • 光能比: 高效(>0.5), 中等(0.3-0.5), 低效(<0.3)<br/>
     <br/>
-    Technical Features:<br/>
-    This analysis is based on four optical measurement systems: Radiometry, Photometry, Photonmetry, and Plant Photonmetry.<br/>
-    Combined with McCree (1972) plant photosynthetic sensitivity curve, it provides scientifically accurate LED plant lighting evaluation.
+    技术特点：<br/>
+    本分析基于四种光学度量体系：辐射度学、光度学、光子度量学、植物光子度量学。<br/>
+    结合McCree (1972)植物光合敏感曲线，提供科学准确的LED植物照明评价。
     """
     
     story.append(Paragraph(method_text, normal_style))
     story.append(Spacer(1, 30))
     
-    # Report signature
+    # 报告署名
     footer_text = f"""
     ————————————————————————————————————————————————————————————<br/>
-    LED Plant Lighting Optical Measurement System Analysis<br/>
-    Report Generated Time: {current_time}<br/>
-    Technical Support: Professional analysis tool based on scientific photometry theory<br/>
+    LED植物照明光学度量体系分析系统<br/>
+    报告生成时间: {current_time}<br/>
+    技术支持: 基于科学光度量理论的专业分析工具<br/>
     ————————————————————————————————————————————————————————————
     """
     
