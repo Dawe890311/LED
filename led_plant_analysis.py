@@ -173,94 +173,64 @@ def generate_chart_images(results, df_clean):
         import matplotlib.font_manager as fm
         import platform
         import os
+        import numpy as np
         
-        # 设置matplotlib中文字体 - 增强版本，优先使用本地字体
-        # 首先尝试加载项目中的中文字体
-        local_font_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'fonts', 'NotoSansSC-Regular.ttf')
-        font_set = False
-        
-        # 尝试注册并使用本地字体
-        if os.path.exists(local_font_path):
-            try:
-                font_prop = fm.FontProperties(fname=local_font_path)
-                # 设置全局字体
-                plt.rcParams['font.sans-serif'] = ['Noto Sans SC', 'SimHei', 'Arial Unicode MS', 'DejaVu Sans']
-                plt.rcParams['axes.unicode_minus'] = False  # 解决负号显示问题
-                font_set = True
-                print(f"✅ 成功加载本地中文字体: {local_font_path}")
-            except Exception as e:
-                print(f"⚠️ 加载本地字体失败: {str(e)}")
-        
-        # 获取系统信息
-        system = platform.system()
-        
-        # 如果本地字体加载失败，尝试系统字体
-        if not font_set:
-            # 寻找系统中可用的中文字体
-            chinese_fonts = []
-        
-        if not font_set and system == "Windows":
-            # Windows常见中文字体路径
-            potential_fonts = [
-                'C:/Windows/Fonts/simhei.ttf',     # 黑体
-                'C:/Windows/Fonts/simsun.ttc',     # 宋体
-                'C:/Windows/Fonts/msyh.ttc',       # 微软雅黑
-                'C:/Windows/Fonts/simkai.ttf',     # 楷体
-                'C:/Windows/Fonts/simfang.ttf'     # 仿宋
-            ]
-            font_names = ['SimHei', 'SimSun', 'Microsoft YaHei', 'KaiTi', 'FangSong']
-        elif not font_set and system == "Darwin":  # macOS
-            potential_fonts = [
-                '/System/Library/Fonts/PingFang.ttc',
-                '/System/Library/Fonts/STSong.ttc',
-                '/System/Library/Fonts/STHeiti Light.ttc',
-                '/System/Library/Fonts/STKaiti.ttc',
-                '/System/Library/Fonts/STFangsong.ttc'
-            ]
-            font_names = ['PingFang SC', 'STSong', 'STHeiti', 'STKaiti', 'STFangsong']
-        elif not font_set:  # Linux
-            potential_fonts = [
-                '/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf',
-                '/usr/share/fonts/truetype/wqy/wqy-microhei.ttc',
-                '/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc',
-                '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc'
-            ]
-            font_names = ['Droid Sans Fallback', 'WenQuanYi Micro Hei', 'WenQuanYi Zen Hei', 'Noto Sans CJK']
-        
-        # 只有在需要尝试系统字体时才执行这部分代码
-        if not font_set:
-            # 检查字体文件是否存在并添加到matplotlib
-            for font_path, font_name in zip(potential_fonts, font_names):
-                if os.path.exists(font_path):
-                    try:
-                        # 添加字体到matplotlib
-                        fm.fontManager.addfont(font_path)
-                        chinese_fonts.append(font_name)
-                    except Exception as e:
-                        print(f"无法添加字体 {font_name}: {e}")
-                        continue
-        
-        # 设置matplotlib字体
-        try:
-            if chinese_fonts:
-                plt.rcParams['font.sans-serif'] = chinese_fonts + ['DejaVu Sans', 'Arial']
-                print(f"成功加载中文字体: {chinese_fonts}")
-            else:
-                # 如果没有找到中文字体，尝试使用系统内置的
-                plt.rcParams['font.sans-serif'] = ['SimHei', 'PingFang SC', 'DejaVu Sans', 'Arial']
-                print("使用系统默认字体设置")
-            
+        # 创建matplotlib字体配置函数
+        def configure_chinese_fonts():
+            """配置matplotlib中文字体支持"""
+            # 重置字体配置
+            plt.rcParams.update(plt.rcParamsDefault)
             plt.rcParams['axes.unicode_minus'] = False  # 解决负号显示问题
             
-            # 测试中文字体是否可用
-            current_font = plt.rcParams['font.sans-serif'][0]
-            print(f"当前使用的字体: {current_font}")
+            # 强制设置字体支持
+            plt.rcParams['font.family'] = ['sans-serif']
             
-        except Exception as e:
-            print(f"字体设置失败，使用默认设置: {e}")
-            # 使用最基本的设置
-            plt.rcParams['font.sans-serif'] = ['DejaVu Sans', 'Arial']
-            plt.rcParams['axes.unicode_minus'] = False
+            # 首先尝试加载项目中的中文字体
+            base_dir = os.path.dirname(os.path.abspath(__file__))
+            fonts_dir = os.path.join(base_dir, 'fonts')
+            noto_font_path = os.path.join(fonts_dir, 'NotoSansSC-Regular.ttf')
+            
+            # 备选字体列表
+            fallback_fonts = []
+            
+            # 系统字体路径
+            system = platform.system()
+            if system == "Windows":
+                fallback_fonts = ['SimHei', 'Microsoft YaHei', 'SimSun']
+            elif system == "Darwin":  # macOS
+                fallback_fonts = ['STHeiti', 'PingFang SC', 'Arial Unicode MS']
+            else:  # Linux
+                fallback_fonts = ['WenQuanYi Micro Hei', 'Noto Sans CJK SC', 'DejaVu Sans']
+            
+            # 首先尝试NotoSansSC字体
+            if os.path.exists(noto_font_path):
+                try:
+                    # 直接注册字体
+                    font_prop = fm.FontProperties(fname=noto_font_path)
+                    # 获取字体的实际名称
+                    font_name = font_prop.get_name()
+                    print(f"✅ 找到本地字体: {noto_font_path}")
+                    
+                    # 添加到字体列表开头
+                    fallback_fonts.insert(0, font_name)
+                except Exception as e:
+                    print(f"⚠️ 加载本地字体失败: {str(e)}")
+            
+            # 设置字体列表
+            plt.rcParams['font.sans-serif'] = fallback_fonts + ['Arial', 'Helvetica', 'sans-serif']
+            print(f"📋 字体配置: {plt.rcParams['font.sans-serif']}")
+            
+            # 验证字体设置
+            fig, ax = plt.subplots(figsize=(1, 1))
+            test_text = ax.text(0.5, 0.5, '测试中文字体', ha='center', va='center')
+            used_font = test_text.get_fontproperties().get_name()
+            plt.close(fig)
+            print(f"✅ 实际使用的字体: {used_font}")
+            
+            return plt.rcParams['font.sans-serif'][0]
+        
+        # 配置中文字体
+        primary_font = configure_chinese_fonts()
         
         # 1. 光谱分布图（彩虹图谱）
         fig, ax = plt.subplots(figsize=(12, 6))
@@ -333,10 +303,10 @@ def generate_chart_images(results, df_clean):
         # 添加整体光谱线条作为轮廓
         ax.plot(wavelengths, radiations, color='black', linewidth=1.5, alpha=0.7)
         
-        # 设置坐标轴和标题
-        ax.set_xlabel('波长 (nm)', fontsize=12, fontweight='bold')
-        ax.set_ylabel('辐射强度', fontsize=12, fontweight='bold')
-        ax.set_title('LED光谱分布图 (彩虹色谱)', fontsize=14, fontweight='bold')
+        # 设置坐标轴和标题 - 显式指定字体
+        ax.set_xlabel('波长 (nm)', fontsize=12, fontweight='bold', fontproperties=fm.FontProperties(family=primary_font))
+        ax.set_ylabel('辐射强度', fontsize=12, fontweight='bold', fontproperties=fm.FontProperties(family=primary_font))
+        ax.set_title('LED光谱分布图 (彩虹色谱)', fontsize=14, fontweight='bold', fontproperties=fm.FontProperties(family=primary_font))
         ax.grid(True, alpha=0.3)
         
         # 添加波段标记
@@ -352,6 +322,7 @@ def generate_chart_images(results, df_clean):
                 ax.axvspan(start, end, alpha=0.1, color=band_colors[i])
                 ax.text(center, max_y * 1.1, label, ha='center', va='bottom', 
                        fontsize=11, fontweight='bold',
+                       fontproperties=fm.FontProperties(family=primary_font),
                        bbox=dict(boxstyle="round,pad=0.3", facecolor='white', alpha=0.8, edgecolor=band_colors[i]))
         
         plt.tight_layout()
@@ -387,18 +358,25 @@ def generate_chart_images(results, df_clean):
         
         colors_pie = ['#4285F4', '#34A853', '#EA4335', '#FB04DA']
         
+        # 创建文字属性字典，显式指定字体
+        text_props = {'fontsize': 11, 'fontweight': 'bold', 'fontproperties': fm.FontProperties(family=primary_font)}
+        
         wedges, texts, autotexts = ax.pie(sizes, labels=labels, colors=colors_pie, autopct='%1.1f%%',
-                                         startangle=90, textprops={'fontsize': 11, 'fontweight': 'bold'})
+                                         startangle=90, textprops=text_props)
         
         # 确保饼图标签使用正确字体
         for text in texts:
             text.set_fontweight('bold')
+            text.set_fontproperties(fm.FontProperties(family=primary_font))
         for autotext in autotexts:
             autotext.set_color('white')
             autotext.set_fontweight('bold')
             autotext.set_fontsize(10)
+            # 百分比文本也需要设置字体
+            autotext.set_fontproperties(fm.FontProperties(family=primary_font))
             
-        ax.set_title('光质分布占比', fontsize=16, fontweight='bold', pad=20)
+        ax.set_title('光质分布占比', fontsize=16, fontweight='bold', pad=20, 
+                   fontproperties=fm.FontProperties(family=primary_font))
         
         plt.tight_layout()
         
@@ -430,18 +408,23 @@ def generate_chart_images(results, df_clean):
             ax.plot(angles, values, 'o-', linewidth=3, color='#4285F4', markersize=8)
             ax.fill(angles, values, alpha=0.25, color='#4285F4')
             ax.set_xticks(angles[:-1])
-            ax.set_xticklabels(categories, fontsize=12, fontweight='bold')
+            # 显式设置所有标签的字体
+            ax.set_xticklabels(categories, fontsize=12, fontweight='bold', 
+                             fontproperties=fm.FontProperties(family=primary_font))
             ax.set_ylim(0, 100)
             ax.set_yticks([20, 40, 60, 80, 100])
-            ax.set_yticklabels(['20', '40', '60', '80', '100'], fontsize=10, fontweight='bold')
-            ax.set_title('作物适应性评价', fontsize=16, fontweight='bold', pad=30)
+            ax.set_yticklabels(['20', '40', '60', '80', '100'], fontsize=10, fontweight='bold',
+                             fontproperties=fm.FontProperties(family=primary_font))
+            ax.set_title('作物适应性评价', fontsize=16, fontweight='bold', pad=30, 
+                       fontproperties=fm.FontProperties(family=primary_font))
             ax.grid(True, alpha=0.6)
             
             # 设置网格线样式
             ax.grid(True, linestyle='--', alpha=0.7)
         else:
             ax.text(0.5, 0.5, '无作物适应性数据', transform=ax.transAxes, 
-                   ha='center', va='center', fontsize=14)
+                   ha='center', va='center', fontsize=14,
+                   fontproperties=fm.FontProperties(family=primary_font))
         
         plt.tight_layout()
         
