@@ -1212,9 +1212,9 @@ def generate_pdf_report(results, df_clean):
         # 确保使用可靠的字体
         print(f"📋 使用字体: {pdf_font}")
     
-    # 使用pdf_font变量而不是chinese_font
-    chinese_font = pdf_font  # 保持与后续代码的兼容性
-    print(f"📋 PDF报告字体已设置为: {chinese_font}")
+    # 使用pdf_font变量确保英文显示
+    pdf_font = pdf_font
+    print(f"📋 PDF报告字体已设置为: {pdf_font}")
     
     # 创建自定义样式（英文优先）
     # 确保使用标准英文字体
@@ -1226,7 +1226,7 @@ def generate_pdf_report(results, df_clean):
         spaceAfter=30,
         alignment=1,  # 居中
         textColor=colors.darkblue,
-        fontName=chinese_font
+        fontName=pdf_font
     )
     
     heading_style = ParagraphStyle(
@@ -1235,7 +1235,7 @@ def generate_pdf_report(results, df_clean):
         fontSize=14,
         spaceAfter=12,
         textColor=colors.darkblue,
-        fontName=chinese_font
+        fontName=pdf_font
     )
     
     subheading_style = ParagraphStyle(
@@ -1244,7 +1244,7 @@ def generate_pdf_report(results, df_clean):
         fontSize=12,
         spaceAfter=8,
         textColor=colors.darkgreen,
-        fontName=chinese_font
+        fontName=pdf_font
     )
     
     normal_style = ParagraphStyle(
@@ -1252,7 +1252,7 @@ def generate_pdf_report(results, df_clean):
         parent=styles['Normal'],
         fontSize=10,
         spaceAfter=6,
-        fontName=chinese_font,
+        fontName=pdf_font,
         encoding='UTF-8'
     )
     
@@ -1261,41 +1261,41 @@ def generate_pdf_report(results, df_clean):
         'CustomTable',
         parent=styles['Normal'],
         fontSize=9,
-        fontName=chinese_font,
+        fontName=pdf_font,
         encoding='UTF-8'
     )
     
-    print("📝 PDF样式创建完成，所有样式已应用中文字体设置")
+    print("📝 PDF样式创建完成，所有样式已应用英文字体设置")
     
     # 内容列表
     story = []
     
     # 标题
-    title = Paragraph("LED植物照明光学度量体系分析报告", title_style)
+    title = Paragraph("LED Plant Lighting Optical Measurement System Analysis Report", title_style)
     story.append(title)
     story.append(Spacer(1, 20))
     
     # 报告生成时间
     current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    time_para = Paragraph(f"报告生成时间：{current_time}", normal_style)
+    time_para = Paragraph(f"Report Generated Time: {current_time}", normal_style)
     story.append(time_para)
     story.append(Spacer(1, 20))
     
     # 基本信息
-    story.append(Paragraph("测试基本信息", heading_style))
+    story.append(Paragraph("Test Basic Information", heading_style))
     
     basic_info = results.get('basic_info', {})
     input_params = results.get('input_params', {})
     
     basic_data = [
-        ['项目', '数值'],
-        ['灯具型号', basic_info.get('lamp_model', '未填写')],
-        ['制造商/单位', basic_info.get('manufacturer', '未填写')],
-        ['测试日期', basic_info.get('test_date', '未填写')],
-        ['总辐射通量', f"{input_params.get('total_radiation_flux', 0):.1f} W"],
-        ['总功率', f"{input_params.get('total_power', 0):.1f} W"],
-        ['后面板温度', f"{input_params.get('back_panel_temp', 0):.1f} ℃"],
-        ['功率因数', f"{input_params.get('power_factor', 0):.3f}"]
+        ['Item', 'Value'],
+        ['Lamp Model', basic_info.get('lamp_model', 'Not filled')],
+        ['Manufacturer/Unit', basic_info.get('manufacturer', 'Not filled')],
+        ['Test Date', basic_info.get('test_date', 'Not filled')],
+        ['Total Radiation Flux', f"{input_params.get('total_radiation_flux', 0):.1f} W"],
+        ['Total Power', f"{input_params.get('total_power', 0):.1f} W"],
+        ['Back Panel Temperature', f"{input_params.get('back_panel_temp', 0):.1f} °C"],
+        ['Power Factor', f"{input_params.get('power_factor', 0):.3f}"]
     ]
     
     basic_table = Table(basic_data, colWidths=[2*inch, 3*inch])
@@ -1303,7 +1303,7 @@ def generate_pdf_report(results, df_clean):
         ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
         ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-        ('FONTNAME', (0, 0), (-1, -1), chinese_font),  # 使用中文字体
+        ('FONTNAME', (0, 0), (-1, -1), pdf_font),  # 使用英文字体
         ('FONTSIZE', (0, 0), (-1, 0), 12),
         ('FONTSIZE', (0, 1), (-1, -1), 10),
         ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
@@ -1315,22 +1315,22 @@ def generate_pdf_report(results, df_clean):
     story.append(Spacer(1, 20))
     
     # 综合评价
-    story.append(Paragraph("综合评价", heading_style))
+    story.append(Paragraph("Comprehensive Evaluation", heading_style))
     
     calculations = results.get('calculations', {})
     
     # 综合评价表格
     eval_data = [
-        ['评价项目', '数值', '等级'],
-        ['总体评级', f"{calculations.get('quality_rating', '未知')}", ''],
-        ['PPE (光合光子效率)', f"{calculations.get('ppe', 0):.3f} μmol/J", 
-         "优秀" if calculations.get('ppe', 0) > 2.5 else "良好" if calculations.get('ppe', 0) > 2.0 else "一般"],
-        ['PAR占比', f"{calculations.get('par_ratio', 0)*100:.1f}%", 
-         "优秀" if calculations.get('par_ratio', 0) > 0.8 else "良好" if calculations.get('par_ratio', 0) > 0.6 else "一般"],
-        ['R/B比', f"{calculations.get('r_b_ratio', 0):.2f}", 
-         "适宜" if 0.5 <= calculations.get('r_b_ratio', 0) <= 3.0 else "偏离"],
-        ['光能比', f"{calculations.get('light_energy_ratio', 0):.3f}", 
-         "高效" if calculations.get('light_energy_ratio', 0) > 0.5 else "中等" if calculations.get('light_energy_ratio', 0) > 0.3 else "低效"]
+        ['Evaluation Item', 'Value', 'Level'],
+        ['Overall Rating', f"{calculations.get('quality_rating', 'Unknown')}", ''],
+        ['PPE (Photosynthetic Photon Efficiency)', f"{calculations.get('ppe', 0):.3f} μmol/J", 
+         "Excellent" if calculations.get('ppe', 0) > 2.5 else "Good" if calculations.get('ppe', 0) > 2.0 else "Fair"],
+        ['PAR Percentage', f"{calculations.get('par_ratio', 0)*100:.1f}%", 
+         "Excellent" if calculations.get('par_ratio', 0) > 0.8 else "Good" if calculations.get('par_ratio', 0) > 0.6 else "Fair"],
+        ['R/B Ratio', f"{calculations.get('r_b_ratio', 0):.2f}", 
+         "Suitable" if 0.5 <= calculations.get('r_b_ratio', 0) <= 3.0 else "Deviated"],
+        ['Light Energy Ratio', f"{calculations.get('light_energy_ratio', 0):.3f}", 
+         "High Efficiency" if calculations.get('light_energy_ratio', 0) > 0.5 else "Medium" if calculations.get('light_energy_ratio', 0) > 0.3 else "Low Efficiency"]
     ]
     
     eval_table = Table(eval_data, colWidths=[2*inch, 2*inch, 1.5*inch])
@@ -1338,7 +1338,7 @@ def generate_pdf_report(results, df_clean):
         ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('FONTNAME', (0, 0), (-1, -1), chinese_font),
+        ('FONTNAME', (0, 0), (-1, -1), pdf_font),
         ('FONTSIZE', (0, 0), (-1, 0), 10),
         ('FONTSIZE', (0, 1), (-1, -1), 9),
         ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
@@ -1350,17 +1350,17 @@ def generate_pdf_report(results, df_clean):
     story.append(Spacer(1, 20))
     
     # 核心性能指标
-    story.append(Paragraph("核心性能指标", heading_style))
+    story.append(Paragraph("Core Performance Indicators", heading_style))
     
     performance_data = [
-        ['指标', '数值', '单位', '说明'],
-        ['总光子通量', f"{calculations.get('total_photon_flux', 0):.2f}", 'μmol/s', '总辐射通量×光能比'],
-        ['PAR功率', f"{calculations.get('par_power', 0):.2f}", 'W', 'PAR波段(400-700nm)功率'],
-        ['光效', f"{calculations.get('luminous_efficacy', 0):.3f}", 'W/W', '辐射光效'],
-        ['估算PPFD', f"{calculations.get('ppfd_estimated', 0):.0f}", 'μmol/m²/s', '假设1m²面积的光强'],
-        ['光能利用效率', f"{calculations.get('light_energy_efficiency', 0)*100:.1f}", '%', 'PAR功率占总功率比例'],
-        ['热损失率', f"{calculations.get('heat_loss_rate', 0)*100:.1f}", '%', '转化为热量的功率比例'],
-        ['年度电费', f"{calculations.get('annual_electricity_cost', 0):.0f}", '元', '按12小时/天运行估算']
+        ['Indicator', 'Value', 'Unit', 'Description'],
+        ['Total Photon Flux', f"{calculations.get('total_photon_flux', 0):.2f}", 'μmol/s', 'Total Radiation Flux × Light Energy Ratio'],
+        ['PAR Power', f"{calculations.get('par_power', 0):.2f}", 'W', 'PAR band (400-700nm) power'],
+        ['Luminous Efficacy', f"{calculations.get('luminous_efficacy', 0):.3f}", 'W/W', 'Radiation efficacy'],
+        ['Estimated PPFD', f"{calculations.get('ppfd_estimated', 0):.0f}", 'μmol/m²/s', 'Light intensity assuming 1m² area'],
+        ['Light Energy Utilization Efficiency', f"{calculations.get('light_energy_efficiency', 0)*100:.1f}", '%', 'Ratio of PAR power to total power'],
+        ['Heat Loss Rate', f"{calculations.get('heat_loss_rate', 0)*100:.1f}", '%', 'Ratio of power converted to heat'],
+        ['Annual Electricity Cost', f"{calculations.get('annual_electricity_cost', 0):.0f}", 'USD', 'Estimated based on 12 hours/day operation']
     ]
     
     performance_table = Table(performance_data, colWidths=[1.5*inch, 1.2*inch, 0.8*inch, 2*inch])
@@ -1368,7 +1368,7 @@ def generate_pdf_report(results, df_clean):
         ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('FONTNAME', (0, 0), (-1, -1), chinese_font),
+        ('FONTNAME', (0, 0), (-1, -1), pdf_font),
         ('FONTSIZE', (0, 0), (-1, 0), 9),
         ('FONTSIZE', (0, 1), (-1, -1), 8),
         ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
@@ -1384,7 +1384,7 @@ def generate_pdf_report(results, df_clean):
     
     # 添加光谱分布图（修复长宽比）
     if 'spectrum' in chart_images:
-        story.append(Paragraph("光谱分布分析", heading_style))
+        story.append(Paragraph("Spectral Distribution Analysis", heading_style))
         chart_images['spectrum'].seek(0)
         
         # 获取图片实际尺寸并保持长宽比
@@ -1443,7 +1443,7 @@ def generate_pdf_report(results, df_clean):
         ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('FONTNAME', (0, 0), (-1, -1), chinese_font),
+        ('FONTNAME', (0, 0), (-1, -1), pdf_font),
         ('FONTSIZE', (0, 0), (-1, 0), 9),
         ('FONTSIZE', (0, 1), (-1, -1), 8),
         ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
@@ -1508,7 +1508,7 @@ def generate_pdf_report(results, df_clean):
         ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
         ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-        ('FONTNAME', (0, 0), (-1, -1), chinese_font),
+        ('FONTNAME', (0, 0), (-1, -1), pdf_font),
         ('FONTSIZE', (0, 0), (-1, 0), 9),
         ('FONTSIZE', (0, 1), (-1, -1), 8),
         ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
@@ -1584,7 +1584,7 @@ def generate_pdf_report(results, df_clean):
         ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('FONTNAME', (0, 0), (-1, -1), chinese_font),
+        ('FONTNAME', (0, 0), (-1, -1), pdf_font),
         ('FONTSIZE', (0, 0), (-1, 0), 9),
         ('FONTSIZE', (0, 1), (-1, -1), 8),
         ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
@@ -1622,7 +1622,7 @@ def generate_pdf_report(results, df_clean):
             ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
             ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('FONTNAME', (0, 0), (-1, -1), chinese_font),
+            ('FONTNAME', (0, 0), (-1, -1), pdf_font),
             ('FONTSIZE', (0, 0), (-1, 0), 9),
             ('FONTSIZE', (0, 1), (-1, -1), 8),
             ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
@@ -1674,7 +1674,7 @@ def generate_pdf_report(results, df_clean):
         ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
         ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-        ('FONTNAME', (0, 0), (-1, -1), chinese_font),
+        ('FONTNAME', (0, 0), (-1, -1), pdf_font),
         ('FONTSIZE', (0, 0), (-1, 0), 9),
         ('FONTSIZE', (0, 1), (-1, -1), 8),
         ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
